@@ -6,15 +6,17 @@ namespace TeaBot {
 using Object = td_api::object_ptr<td_api::Object>;
 
 /**
- * @param const char                 *storage_path
- * @param std::unique_ptr<Responses> responses
+ * @param uint32_t   api_id
+ * @param const cahr *api_hash
+ * @param const char *storage_path
  *
  * Constructor.
  */
-TdLibHandler::TdLibHandler(const char *storage_path,
-                           std::unique_ptr<Responses> responses):
-    storage_path_(storage_path)
-  , responses_(std::move(responses))
+TdLibHandler::TdLibHandler(uint32_t api_id, const char *api_hash,
+                           const char *storage_path):
+    api_id_(api_id)
+  , api_hash_(api_hash)
+  , storage_path_(storage_path)
 {
   td::ClientManager::execute(td_api::make_object<td_api::setLogVerbosityLevel>(1));
   
@@ -22,6 +24,26 @@ TdLibHandler::TdLibHandler(const char *storage_path,
   client_id_      = client_manager_->create_client_id();
 
   send_query(td_api::make_object<td_api::getOption>("version"), {});
+}
+
+
+/**
+ * @param void (*updateNewMessageCallback)(
+    td_api::updateNewMessage &update,
+    TdLibHandler *handler
+  )
+ *
+ * @return void
+ */
+void
+setUpdateNewMessageCallback(
+  std::function<void (
+    td_api::updateNewMessage &update,
+    TdLibHandler *handler
+  )> updateNewMessageCallback
+)
+{
+  this->updateNewMessageCallback = updateNewMessageCallback;
 }
 
 
@@ -56,7 +78,7 @@ void
 TdLibHandler::restart()
 {
   client_manager_.reset();
-  *this = TdLibHandler(this->storage_path_, std::move(this->responses_));
+  *this = TdLibHandler(api_id_, api_hash_, storage_path_);
 }
 
 
@@ -119,7 +141,9 @@ TdLibHandler::process_update(td_api::object_ptr<td_api::Object> update)
 
       [this](td_api::updateNewMessage &update)
       {
-        std::cout << to_string(update) << std::endl;
+        if (this->updateNewMessageCallback) {
+          this->updateNewMessageCallback(update, this);
+        }
       },
 
       [](auto &update)
@@ -273,15 +297,15 @@ TdLibHandler::on_authorization_state_update()
       {
         auto params = td_api::make_object<td_api::tdlibParameters>();
 
-        params->api_id_   = 2841585;
-        params->api_hash_ = "fed2843d34aeb38d86cee964243d6ed9";
-        params->database_directory_ = std::string(storage_path_);
+        params->api_id_   = this->api_id_;
+        params->api_hash_ = this->api_hash_;
+        params->database_directory_ = this->storage_path_;
 
         params->use_secret_chats_ = true;
         params->use_message_database_ = true;
 
-        params->system_language_code_ = "en";
         params->device_model_ = "Desktop";
+        params->system_language_code_ = "en";
         params->application_version_ = "1.0";
 
         params->enable_storage_optimizer_ = true;
@@ -293,7 +317,7 @@ TdLibHandler::on_authorization_state_update()
       },
       [](auto &update)
       {
-        std::cout << "any auth" << std::endl;
+        // std::cout << "any auth" << std::endl;
       }
     )
   );
