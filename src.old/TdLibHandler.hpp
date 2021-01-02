@@ -16,8 +16,6 @@
 #include <iostream>
 #include <functional>
 
-#include "Responses.hpp"
-
 namespace detail {
 
 template <class... Fs>
@@ -48,14 +46,16 @@ auto overloaded(F... f) {
 
 namespace td_api = td::td_api;
 
-namespace TeaBot8 {
+namespace TeaBot {
 
 class TdLibHandler
 {
 private:
   using Object = td_api::object_ptr<td_api::Object>;
 
-  const char *storage_path_ = nullptr;
+  uint32_t api_id_;
+  const char *api_hash_;
+  const char *storage_path_;
 
   int32_t  client_id_{0};
   uint64_t current_query_id_{0};
@@ -64,7 +64,6 @@ private:
   bool need_restart_{false};
   bool are_authorized_{false};
 
-  std::unique_ptr<Responses> responses_;
   std::unique_ptr<td::ClientManager> client_manager_;
 
   std::map<int64_t, std::string> chat_title_;
@@ -72,6 +71,11 @@ private:
   std::map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
   td_api::object_ptr<td_api::AuthorizationState> authorization_state_;
+
+  std::function<void(
+    td_api::updateNewMessage &update,
+    TdLibHandler *handler
+  )> updateNewMessageCallback;
 
   void
   restart();
@@ -84,10 +88,6 @@ private:
 
   void
   process_update(td_api::object_ptr<td_api::Object> update);
-
-  void
-  send_query(td_api::object_ptr<td_api::Function> f,
-             std::function<void(Object)> handler);
 
   std::string
   get_user_name(int32_t user_id) const;
@@ -107,13 +107,24 @@ private:
   bool
   handle_loop();
 public:
-  TdLibHandler(const char *storage_path,
-               std::unique_ptr<Responses> responses);
+  TdLibHandler(uint32_t api_id, const char *api_hash, const char *storage_path);
+
+  void setUpdateNewMessageCallback(
+    std::function<void (
+      td_api::updateNewMessage &update,
+      TdLibHandler *handler
+    )> updateNewMessageCallback
+  );
 
   void
   loop();
+
+  void
+  send_query(td_api::object_ptr<td_api::Function> f,
+             std::function<void(Object)> handler);
+
 };
 
-} /* namespace TeaBot8 */
+} /* namespace TeaBot */
 
 #endif /* #ifndef __TdLibHandler_HPP */
