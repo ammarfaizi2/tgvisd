@@ -10,7 +10,7 @@ namespace TeaBot {
  */
 TeaBot::TeaBot(const char *storage_path):
     storage_path_(storage_path)
-  , handler(storage_path_)
+  , handler(storage_path)
 {
 
 }

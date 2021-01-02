@@ -53,6 +53,8 @@ class TdLibHandler
 private:
   using Object = td_api::object_ptr<td_api::Object>;
 
+  const char *storage_path_ = nullptr;
+
   int32_t  client_id_{0};
   uint64_t current_query_id_{0};
   uint64_t authentication_query_id_{0};
