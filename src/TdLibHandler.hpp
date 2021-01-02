@@ -16,6 +16,8 @@
 #include <iostream>
 #include <functional>
 
+#include "Responses.hpp"
+
 namespace detail {
 
 template <class... Fs>
@@ -46,7 +48,7 @@ auto overloaded(F... f) {
 
 namespace td_api = td::td_api;
 
-namespace TeaBot {
+namespace TeaBot8 {
 
 class TdLibHandler
 {
@@ -62,6 +64,7 @@ private:
   bool need_restart_{false};
   bool are_authorized_{false};
 
+  std::unique_ptr<Responses> responses_;
   std::unique_ptr<td::ClientManager> client_manager_;
 
   std::map<int64_t, std::string> chat_title_;
@@ -104,12 +107,13 @@ private:
   bool
   handle_loop();
 public:
-  TdLibHandler(const char *storage_path);
+  TdLibHandler(const char *storage_path,
+               std::unique_ptr<Responses> responses);
 
   void
   loop();
 };
 
-} /* namespace TeaBot */
+} /* namespace TeaBot8 */
 
 #endif /* #ifndef __TdLibHandler_HPP */

@@ -5,7 +5,7 @@
 #include "Responses.hpp"
 #include "TdLibHandler.hpp"
 
-namespace TeaBot {
+namespace TeaBot8 {
 
 class TeaBot
 {
@@ -23,6 +23,6 @@ public:
   run();
 };
 
-} /* namespace TeaBot */
+} /* namespace TeaBot8 */
 
 #endif
