@@ -6,12 +6,15 @@ namespace TeaBot {
 using Object = td_api::object_ptr<td_api::Object>;
 
 /**
- * @param const char *storage_path
+ * @param const char                 *storage_path
+ * @param std::unique_ptr<Responses> responses
  *
  * Constructor.
  */
-TdLibHandler::TdLibHandler(const char *storage_path):
+TdLibHandler::TdLibHandler(const char *storage_path,
+                           std::unique_ptr<Responses> responses):
     storage_path_(storage_path)
+  , responses_(std::move(responses))
 {
   td::ClientManager::execute(td_api::make_object<td_api::setLogVerbosityLevel>(1));
   
@@ -53,7 +56,7 @@ void
 TdLibHandler::restart()
 {
   client_manager_.reset();
-  *this = TdLibHandler(this->storage_path_);
+  *this = TdLibHandler(this->storage_path_, std::move(this->responses_));
 }
 
 
