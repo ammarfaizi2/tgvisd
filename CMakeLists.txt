@@ -8,8 +8,8 @@ find_package(Td 1.7.0 REQUIRED)
 
 set(TEABOT_SOURCE
   src/main.cpp
-  src/TeaBot.cpp
-  src/TdLibHandler.cpp
+  src/TeaBot/TeaBot.cpp
+  src/TeaBot/TdLibHandler.cpp
 )
 
 add_executable(teabot ${TEABOT_SOURCE})
