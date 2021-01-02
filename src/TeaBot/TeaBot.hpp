@@ -2,20 +2,20 @@
 #ifndef __TeaBot__TeaBot_HPP
 #define __TeaBot__TeaBot_HPP
 
+#include <cstdint>
+
+#include "TdLibHandler.hpp"
+
 namespace TeaBot {
 
 class TeaBot
 {
 private:
-  const uint32_t api_id_;
-  const char     *api_hash_;
-  const char     *data_path_;
+  TdLibHandler handler;
 
 public:
-  TeaBot(uint32_t api_id, const char *api_hash, const char *data_path_);
-
+  TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
   ~TeaBot();
-
   void run();
 };
 

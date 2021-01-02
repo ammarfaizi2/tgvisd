@@ -106,6 +106,7 @@ private:
 
   bool
   handle_loop();
+
 public:
   TdLibHandler(uint32_t api_id, const char *api_hash, const char *storage_path);
 
