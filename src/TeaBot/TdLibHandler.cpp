@@ -4,8 +4,7 @@
 
 namespace TeaBot {
 
-using Object = td_api::object_ptr<td_api::Object>;
-
+using Object  = td_api::object_ptr<td_api::Object>;
 
 /**
  * @param uint32_t    api_id
@@ -203,6 +202,17 @@ void TdLibHandler::on_authorization_state_update()
             [this](td_api::authorizationStateReady &) {
               are_authorized_ = true;
               std::cout << "Got authorization" << std::endl;
+
+              /* Get account user_id. */
+              send_query(
+                td_api::make_object<td_api::getMe>(),
+                [this](Object user_obj){
+                    if (user_obj->get_id() == td_api::user::ID) {
+                        user_id_ = (td::move_tl_object_as<td_api::user>(user_obj))->id_;
+                    }
+                }
+              );
+
             },
             [this](td_api::authorizationStateLoggingOut &) {
               are_authorized_ = false;
@@ -347,5 +357,21 @@ void TdLibHandler::setCallback(
     this->onUpdateNewMessageCallback = onUpdateNewMessageCallback;
 }
 
+
+/**
+ * @return int32_t
+ */
+int32_t TdLibHandler::get_client_id()
+{
+    return client_id_;
+}
+
+/**
+ * @return int32_t
+ */
+int32_t TdLibHandler::get_user_id()
+{
+    return user_id_;
+}
 
 } /* namespace TeaBot */
