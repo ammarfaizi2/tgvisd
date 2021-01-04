@@ -1,4 +1,10 @@
 
+/**
+ * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
+ * @license MIT
+ * @package \TeaBot
+ */
+
 #ifndef __detail_HPP
 #define __detail_HPP
 

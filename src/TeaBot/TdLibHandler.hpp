@@ -1,4 +1,10 @@
 
+/**
+ * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
+ * @license MIT
+ * @package \TeaBot
+ */
+
 #ifndef __TdLibHandler_HPP
 #define __TdLibHandler_HPP
 
@@ -6,15 +12,12 @@
 #include <td/telegram/td_api.h>
 #include <td/telegram/td_api.hpp>
 
-#include <map>
 #include <string>
-#include <vector>
-#include <limits>
 #include <memory>
 #include <cstdint>
-#include <sstream>
 #include <iostream>
 #include <functional>
+#include <unordered_map>
 
 #include "detail.hpp"
 
@@ -43,9 +46,9 @@ private:
     std::unique_ptr<td::ClientManager> client_manager_;
     td_api::object_ptr<td_api::AuthorizationState> authorization_state_;
 
-    std::map<int64_t, std::string> chat_title_;
-    std::map<uint64_t, std::function<void(Object)>> handlers_;
-    std::map<int32_t, td_api::object_ptr<td_api::user>> users_;
+    std::unordered_map<int64_t, std::string> chat_title_;
+    std::unordered_map<uint64_t, std::function<void(Object)>> handlers_;
+    std::unordered_map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
     std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
         onUpdateNewMessageCallback;
