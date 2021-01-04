@@ -2,23 +2,31 @@
 #include "Responses.hpp"
 
 #include <cstdio>
+#include <errno.h>
 #include <cstring>
 
 namespace TeaBot {
 
 
 /**
- * @param td_api::updateNewMessage &update
+ * @param td_api::updateNewMessage update
  * @param TdLibHandler             *handler
  *
  * Constructor.
  */
-Responses::Responses(td_api::updateNewMessage &update, TdLibHandler *handler):
-        update_(update)
+Responses::Responses(td_api::updateNewMessage update, TdLibHandler *handler):
+        update_(std::move(update))
     ,   handler_(handler)
 {
+}
 
-    chat_id_ = update.message_->chat_id_;
+
+/**
+ * @return void
+ */
+void Responses::run()
+{
+    chat_id_ = update_.message_->chat_id_;
     td_api::downcast_call(
         *(update_.message_->sender_),
         overloaded(
@@ -32,14 +40,7 @@ Responses::Responses(td_api::updateNewMessage &update, TdLibHandler *handler):
             }
         )
     );
-}
 
-
-/**
- * @return void
- */
-void Responses::run()
-{
     if (handler_->get_user_id() == sender_id_) {
         handle_self_message();
         return;

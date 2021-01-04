@@ -20,10 +20,10 @@ private:
     std::string sender_name_;
 
     TdLibHandler *handler_;
-    td_api::updateNewMessage &update_;
+    td_api::updateNewMessage update_;
 
 public:
-    Responses(td_api::updateNewMessage &update, TdLibHandler *handler);
+    Responses(td_api::updateNewMessage update, TdLibHandler *handler);
     void run();
     void handle_self_message();
 };

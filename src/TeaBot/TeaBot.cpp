@@ -120,7 +120,7 @@ void TeaBot::spawn_response_handler_thread(td_api::updateNewMessage &update)
     Responses *res;
     pthread_t thread;
 
-    res = new Responses(update, &handler_);
+    res = new Responses(std::move(update), &handler_);
     pthread_create(&thread, NULL, response_thread, (void *)res);
     pthread_detach(thread);
 }

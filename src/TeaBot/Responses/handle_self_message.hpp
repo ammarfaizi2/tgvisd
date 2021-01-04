@@ -6,26 +6,25 @@
 inline static std::string shell_exec(const char *cmd)
 {
     char *p;
-    char out[10240];
-    size_t total_len = 0;
+    char out[8096];
+    size_t outlen = 0;
 
     FILE *handle = popen(cmd, "r");
     if (handle == NULL) {
-        sprintf(out, "Error: %s", strerror(errno));
+        snprintf(out, sizeof(out), "Error: %s", strerror(errno));
         goto ret;
     }
 
-    p = out;
-    while ((total_len < sizeof(out)) && (fgets(p, 4096, handle) != NULL)) {
-        size_t len  = strlen(p);
-        p          += len;
-        total_len  += len;
-    }
-
+    outlen = fread(out, sizeof(char), sizeof(out), handle);
     pclose(handle);
 
 ret:
-    return std::string(out);
+    (void)p;
+    {
+        std::string ret;
+        ret.assign(out, outlen);
+        return ret;
+    }
 }
 
 
