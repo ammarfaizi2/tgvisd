@@ -268,17 +268,17 @@ void TdLibHandler::on_authorization_state_update()
               }
             },
             [this](td_api::authorizationStateWaitTdlibParameters &) {
-              auto parameters = td_api::make_object<td_api::tdlibParameters>();
-              parameters->use_message_database_ = true;
-              parameters->use_secret_chats_ = true;
-              parameters->api_id_ = this->api_id_;
-              parameters->api_hash_ = this->api_hash_;
-              parameters->database_directory_ = this->data_path_;
-              parameters->system_language_code_ = "en";
-              parameters->device_model_ = "Desktop";
-              parameters->application_version_ = "1.0";
-              parameters->enable_storage_optimizer_ = true;
-              send_query(td_api::make_object<td_api::setTdlibParameters>(std::move(parameters)),
+              auto params = td_api::make_object<td_api::tdlibParameters>();
+              params->use_message_database_ = true;
+              params->use_secret_chats_ = true;
+              params->api_id_ = this->api_id_;
+              params->api_hash_ = this->api_hash_;
+              params->database_directory_ = this->data_path_;
+              params->system_language_code_ = "en";
+              params->device_model_ = "Desktop";
+              params->application_version_ = "1.0";
+              params->enable_storage_optimizer_ = true;
+              send_query(td_api::make_object<td_api::setTdlibParameters>(std::move(params)),
                          create_authentication_query_handler());
             }
         )
