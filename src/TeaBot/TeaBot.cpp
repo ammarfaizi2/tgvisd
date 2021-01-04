@@ -1,6 +1,13 @@
 
 #include "TeaBot.hpp"
 
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+#include <errno.h>
+#include <signal.h>
+#include <pthread.h>
+
 namespace TeaBot {
 
 static void handleSelfMessage(td_api::updateNewMessage &update, TdLibHandler *handler);
@@ -26,16 +33,45 @@ TeaBot::TeaBot(uint32_t api_id, const char *api_hash, const char *data_path):
  */
 TeaBot::~TeaBot()
 {
+    handler_.close();
 }
 
+static bool is_signaled = false;
+
+static void handle_signal(int sig)
+{
+    std::cout << "\nGot interrupt signal!" << std::endl;
+    is_signaled = true;
+}
 
 /**
  * @return void
  */
 void TeaBot::run()
 {
-    handler_.loop();
+    signal(SIGINT, handle_signal);
+    while (true) {
+        if (is_signaled) {
+            break;
+        }
+        handler_.loop();
+    }
+}
 
+
+typedef struct _thread_data
+{
+    TdLibHandler *handler;
+    td_api::updateNewMessage update;
+} thread_data;
+
+
+static void *thread_handler(void *_p)
+{
+    thread_data *data = (thread_data *)_p;
+    handleSelfMessage(data->update, data->handler);
+    delete data;
+    return NULL;
 }
 
 
@@ -69,9 +105,43 @@ void TeaBot::onUpdateNewMessage(td_api::updateNewMessage &update, TdLibHandler *
         )
     );
 
+    std::cout << to_string(update) << std::endl;
     if (my_user_id == sender_id) {
-        handleSelfMessage(update, handler);
+        pthread_t thread;
+        thread_data *data = new thread_data;
+
+        data->update  = std::move(update);
+        data->handler = handler;
+        pthread_create(&thread, NULL, thread_handler, (void *)data);
+        pthread_detach(thread);
     }
+}
+
+
+/**
+ * @return const char *
+ */
+static std::string shell_exec(const char *cmd)
+{
+    char *p;
+    char out[10240];
+    FILE *handle;
+
+    handle = popen(cmd, "r");
+    if (handle == NULL) {
+        sprintf(out, "Error: %s", strerror(errno));
+        goto ret;
+    }
+
+    p = out;
+    while (fgets(p, 4096, handle) != NULL) {
+        p += strlen(p);
+    }
+
+    pclose(handle);
+
+ret:
+    return std::string(out);
 }
 
 
@@ -80,14 +150,32 @@ void TeaBot::onUpdateNewMessage(td_api::updateNewMessage &update, TdLibHandler *
  */
 static void handleSelfMessage(td_api::updateNewMessage &update, TdLibHandler *handler)
 {
+    if (update.message_->content_->get_id() != td_api::messageText::ID) {
+        return;
+    }
+
+    const char *cmd;
     auto &msg = update.message_;
     int64_t chat_id = msg->chat_id_;
+    std::string text;
+
+    text = static_cast<td_api::messageText &>(*update.message_->content_).text_->text_;
+    cmd  = text.c_str();
+
+    if (strncmp(cmd, "!sh ", 4) != 0) {
+        return;
+    }
+    cmd += 4;
+
+    if (strlen(cmd) == 0) {
+        return;
+    }
 
     auto emsg = td_api::make_object<td_api::editMessageText>();
     auto imt  = td_api::make_object<td_api::inputMessageText>();
 
     imt->text_ = td_api::make_object<td_api::formattedText>();
-    imt->text_->text_ = "Edited!";
+    imt->text_->text_ = shell_exec(cmd);
     emsg->chat_id_    = chat_id;
     emsg->message_id_ = msg->id_;
     emsg->input_message_content_ = std::move(imt);

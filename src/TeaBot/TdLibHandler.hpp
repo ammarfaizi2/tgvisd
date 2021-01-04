@@ -29,6 +29,7 @@ private:
     const char  *api_hash_;
     const char  *data_path_;
 
+    bool closed_{false};
     bool are_authorized_{false};
     bool need_restart_{false};
 
@@ -62,6 +63,7 @@ public:
     TdLibHandler(uint32_t api_id, const char *api_hash, const char *data_path);
 
     void loop();
+    void close();
     int32_t get_client_id();
     int32_t get_user_id();
 

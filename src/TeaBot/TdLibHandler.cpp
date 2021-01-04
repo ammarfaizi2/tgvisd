@@ -1,7 +1,6 @@
 
 #include "TdLibHandler.hpp"
 
-
 namespace TeaBot {
 
 using Object  = td_api::object_ptr<td_api::Object>;
@@ -32,21 +31,17 @@ TdLibHandler::TdLibHandler(uint32_t api_id, const char *api_hash, const char *da
  */
 void TdLibHandler::loop()
 {
-    while (true) {
-        if (need_restart_) {
-            restart();
-            continue;
-        }
-
-        if (!are_authorized_) {
-            process_response(client_manager_->receive(10));
-            continue;
-        }
-
-        if (!handle_event_loop()) {
-            break;
-        }
+    if (need_restart_) {
+        restart();
+        return;
     }
+
+    if (!are_authorized_) {
+        process_response(client_manager_->receive(10));
+        return;
+    }
+
+    handle_event_loop();
 }
 
 
@@ -91,7 +86,7 @@ uint64_t TdLibHandler::next_query_id()
 bool TdLibHandler::handle_event_loop()
 {
     while (true) {
-        auto response = client_manager_->receive(5);
+        auto response = client_manager_->receive(2);
         if (response.object)
           process_response(std::move(response));
         else
@@ -224,6 +219,7 @@ void TdLibHandler::on_authorization_state_update()
             [this](td_api::authorizationStateClosed &) {
               are_authorized_ = false;
               need_restart_ = true;
+              closed_ = true;
               std::cout << "Terminated" << std::endl;
             },
             [this](td_api::authorizationStateWaitCode &) {
@@ -372,6 +368,17 @@ int32_t TdLibHandler::get_client_id()
 int32_t TdLibHandler::get_user_id()
 {
     return user_id_;
+}
+
+
+/**
+ * @return void
+ */
+void TdLibHandler::close()
+{
+    send_query(td_api::make_object<td_api::close>(), {});
+    std::cout << "Waiting for authorizationStateClosed..." << std::endl;
+    handle_event_loop();
 }
 
 } /* namespace TeaBot */
