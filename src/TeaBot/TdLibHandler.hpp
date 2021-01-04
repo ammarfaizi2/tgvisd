@@ -46,10 +46,18 @@ private:
     std::map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
     void restart();
+    bool handle_event_loop();
     uint64_t next_query_id();
+    void on_authorization_state_update();
+    void check_authentication_error(Object object);
+    std::string get_user_name(int32_t user_id) const;
+    std::string get_chat_title(int64_t chat_id) const;
+    void process_response(td::ClientManager::Response response);
+    void process_update(td_api::object_ptr<td_api::Object> update);
+    std::function<void(Object object)> create_authentication_query_handler();
 public:
     TdLibHandler(uint32_t api_id, const char *api_hash, const char *data_path);
-
+    void loop();
     void send_query(td_api::object_ptr<td_api::Function> f, std::function<void(Object)> handler);
 };
 
