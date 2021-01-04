@@ -45,6 +45,9 @@ private:
     std::map<uint64_t, std::function<void(Object)>> handlers_;
     std::map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
+    std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+        onUpdateNewMessageCallback;
+
     void restart();
     bool handle_event_loop();
     uint64_t next_query_id();
@@ -55,10 +58,15 @@ private:
     void process_response(td::ClientManager::Response response);
     void process_update(td_api::object_ptr<td_api::Object> update);
     std::function<void(Object object)> create_authentication_query_handler();
+
 public:
     TdLibHandler(uint32_t api_id, const char *api_hash, const char *data_path);
     void loop();
     void send_query(td_api::object_ptr<td_api::Function> f, std::function<void(Object)> handler);
+    void setCallback(
+        std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+        onUpdateNewMessageCallback
+    );
 };
 
 } /* namespace TeaBot */
