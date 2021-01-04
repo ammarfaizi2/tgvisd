@@ -5,8 +5,8 @@
  * @package \TeaBot
  */
 
-#ifndef __TdLibHandler_HPP
-#define __TdLibHandler_HPP
+#ifndef __TeaBot__TdLibHandler_HPP
+#define __TeaBot__TdLibHandler_HPP
 
 #include <td/telegram/Client.h>
 #include <td/telegram/td_api.h>
@@ -33,11 +33,11 @@ private:
     const char  *data_path_;
 
     bool closed_{false};
-    bool are_authorized_{false};
     bool need_restart_{false};
+    bool are_authorized_{false};
 
-    int32_t client_id_{0};
     int32_t user_id_{0};
+    int32_t client_id_{0};
     uint64_t current_query_id_{0};
     uint64_t authentication_query_id_{0};
 

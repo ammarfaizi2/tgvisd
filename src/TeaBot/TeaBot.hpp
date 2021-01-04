@@ -21,7 +21,10 @@ namespace TeaBot {
 class TeaBot
 {
 private:
+    size_t nthread;
     TdLibHandler handler_;
+
+    void spawn_response_handler_thread(td_api::updateNewMessage &update);
 
 public:
     TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);

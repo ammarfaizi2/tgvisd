@@ -9,6 +9,7 @@ find_package(Td 1.7.0 REQUIRED)
 set(TEABOT_SOURCE
   src/main.cpp
   src/TeaBot/TeaBot.cpp
+  src/TeaBot/Responses.cpp
 )
 
 
