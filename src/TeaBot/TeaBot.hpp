@@ -11,7 +11,7 @@ namespace TeaBot {
 class TeaBot
 {
 private:
-  TdLibHandler handler;
+  TdLibHandler handler_;
 
 public:
   TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
