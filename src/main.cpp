@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
         pthread_join(threads[i], NULL);
     }
 
+    free(list);
+
     return 0;
 }
 
