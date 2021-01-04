@@ -16,7 +16,9 @@ private:
 public:
   TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
   ~TeaBot();
+
   void run();
+  void onUpdateNewMessage(td_api::updateNewMessage &update, TdLibHandler *handler);
 };
 
 } /* namespace TeaBot */

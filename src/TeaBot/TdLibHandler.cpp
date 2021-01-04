@@ -150,34 +150,39 @@ void TdLibHandler::process_update(td_api::object_ptr<td_api::Object> update)
                 users_[user_id] = std::move(update.user_);
             },
             [this](td_api::updateNewMessage &update) {
-                auto chat_id = update.message_->chat_id_;
-                std::string sender_name;
-                td_api::downcast_call(
-                    *update.message_->sender_,
-                    overloaded(
-                        [this, &sender_name](td_api::messageSenderUser &user) {
-                            sender_name = get_user_name(user.user_id_);
-                        },
-                        [this, &sender_name](td_api::messageSenderChat &chat) {
-                            sender_name = get_chat_title(chat.chat_id_);
-                        }
-                    )
-                );
 
-                std::string text;
-                if (update.message_->content_->get_id() == td_api::messageText::ID) {
-                    text = static_cast<td_api::messageText &>(*update.message_->content_).text_->text_;
+                if (onUpdateNewMessageCallback) {
+                    onUpdateNewMessageCallback(update, this);
                 }
 
-                std::cout
-                    << "Got message: [chat_id:"
-                    << chat_id
-                    << "] [from:"
-                    << sender_name
-                    << "] ["
-                    << text
-                    << "]"
-                    << std::endl;
+                // auto chat_id = update.message_->chat_id_;
+                // std::string sender_name;
+                // td_api::downcast_call(
+                //     *update.message_->sender_,
+                //     overloaded(
+                //         [this, &sender_name](td_api::messageSenderUser &user) {
+                //             sender_name = get_user_name(user.user_id_);
+                //         },
+                //         [this, &sender_name](td_api::messageSenderChat &chat) {
+                //             sender_name = get_chat_title(chat.chat_id_);
+                //         }
+                //     )
+                // );
+
+                // std::string text;
+                // if (update.message_->content_->get_id() == td_api::messageText::ID) {
+                //     text = static_cast<td_api::messageText &>(*update.message_->content_).text_->text_;
+                // }
+
+                // std::cout
+                //     << "Got message: [chat_id:"
+                //     << chat_id
+                //     << "] [from:"
+                //     << sender_name
+                //     << "] ["
+                //     << text
+                //     << "]"
+                //     << std::endl;
             },
             [](auto &update) {
             }
@@ -327,5 +332,20 @@ void TdLibHandler::check_authentication_error(Object object)
       on_authorization_state_update();
     }
 }
+
+
+/**
+ * @param std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+    onUpdateNewMessageCallback
+ * @return void
+ */
+void TdLibHandler::setCallback(
+    std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+    onUpdateNewMessageCallback
+)
+{
+    this->onUpdateNewMessageCallback = onUpdateNewMessageCallback;
+}
+
 
 } /* namespace TeaBot */
