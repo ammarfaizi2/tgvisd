@@ -9,6 +9,10 @@
 #define __TeaBot__TeaBot_HPP
 
 #include <cstdint>
+#include <pthread.h>
+
+#define TEABOT_NUM_OF_THREADS (5)
+#define TEABOT_NUM_OF_QUEUES  (10)
 
 #include "TdLibHandler.hpp"
 
@@ -17,14 +21,14 @@ namespace TeaBot {
 class TeaBot
 {
 private:
-  TdLibHandler handler_;
+    TdLibHandler handler_;
 
 public:
-  TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
-  ~TeaBot();
+    TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
+    ~TeaBot();
 
-  void run();
-  void onUpdateNewMessage(td_api::updateNewMessage &update, TdLibHandler *handler);
+    void run();
+    void onUpdateNewMessage(td_api::updateNewMessage &update);
 };
 
 } /* namespace TeaBot */

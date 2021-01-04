@@ -50,7 +50,7 @@ private:
     std::unordered_map<uint64_t, std::function<void(Object)>> handlers_;
     std::unordered_map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
-    std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+    std::function<void(td_api::updateNewMessage &update)>
         onUpdateNewMessageCallback;
 
     void restart();
@@ -75,7 +75,7 @@ public:
 
     void send_query(td_api::object_ptr<td_api::Function> f, std::function<void(Object)> handler);
     void setCallback(
-        std::function<void(td_api::updateNewMessage &update, TdLibHandler *handler)>
+        std::function<void(td_api::updateNewMessage &update)>
         onUpdateNewMessageCallback
     );
 };
