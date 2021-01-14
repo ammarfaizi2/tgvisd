@@ -1,69 +1,52 @@
 
+#include "self_message/mock_msg.hpp"
+#include "self_message/debug_msg.hpp"
+#include "self_message/shell_exec.hpp"
 
 /**
- * @return const char *
- */
-inline static std::string shell_exec(const char *cmd)
-{
-    char *p;
-    char out[8096];
-    size_t outlen = 0;
-
-    FILE *handle = popen(cmd, "r");
-    if (handle == NULL) {
-        snprintf(out, sizeof(out), "Error: %s", strerror(errno));
-        goto ret;
-    }
-
-    outlen = fread(out, sizeof(char), sizeof(out), handle);
-    pclose(handle);
-
-ret:
-    (void)p;
-    {
-        std::string ret;
-        ret.assign(out, outlen);
-        return ret;
-    }
-}
-
-
-/**
- * @param const char                                *ctext
- * @param size_t                                    len
- * @param TdLibHandler                              *handler
- * @param td_api::object_ptr<td::td_api::message>   &msg
- * @param int64_t                                   chat_id
+ * @param const char *ctext
+ * @param size_t     len
  * @return bool
  */
-inline static bool handle_shell_exec(const char *ctext, size_t len, TdLibHandler *handler,
-                                     td_api::object_ptr<td::td_api::message> &msg,
-                                     int64_t chat_id)
+inline static bool is_cmd_format(const char *ctext, size_t len)
 {
-    if (len < 5)
+    if (len < 2)
         return false;
 
     char c = ctext[0];
     if (!(c == '!' || c == '/' || c == '.'))
         return false;
 
-    ctext++;
-
-    if (memcmp(ctext, "sh ", 3) != 0)
-        return false;
-
-    ctext += 3;
-
-    auto emsg = td_api::make_object<td_api::editMessageText>();
-    auto imt  = td_api::make_object<td_api::inputMessageText>();
-
-    imt->text_ = td_api::make_object<td_api::formattedText>();
-    imt->text_->text_ = shell_exec(ctext);
-    emsg->chat_id_    = chat_id;
-    emsg->message_id_ = msg->id_;
-    emsg->input_message_content_ = std::move(imt);
-
-    handler->send_query(std::move(emsg), {});
-
     return true;
+}
+
+
+/**
+ * @return void
+ */
+void Responses::handle_self_message()
+{
+    td_api::object_ptr<td::td_api::message> &msg = update_.message_;
+
+    if (msg->content_->get_id() != td_api::messageText::ID) {
+        /* Skip non text message. */
+        return;
+    }
+
+    std::string &text  = static_cast<td_api::messageText &>(*(msg->content_)).text_->text_;
+    const char  *ctext = text.c_str();
+    size_t      len    = text.length();
+
+
+    if (is_cmd_format(ctext, len)) {
+
+        if (handle_shell_exec(ctext, len, handler_, msg, chat_id_))
+            return;
+
+        if (handle_debug_msg(ctext, len, handler_, msg, chat_id_))
+            return;
+
+        if (handle_mock_msg(ctext, len, handler_, msg, chat_id_))
+            return;
+    }
 }
