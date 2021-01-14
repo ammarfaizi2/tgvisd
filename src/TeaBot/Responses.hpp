@@ -25,9 +25,11 @@ private:
 public:
     Responses(td_api::updateNewMessage update, TdLibHandler *handler);
     void run();
+    void handle_message();
     void handle_self_message();
 };
 
 } /* namespace TeaBot */
 
 #endif /* #ifndef __TeaBot__Responses_HPP */
+

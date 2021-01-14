@@ -7,7 +7,6 @@
 
 namespace TeaBot {
 
-
 /**
  * @param td_api::updateNewMessage update
  * @param TdLibHandler             *handler
@@ -47,28 +46,6 @@ void Responses::run()
     }
 }
 
-
 #include "Responses/handle_self_message.hpp"
-
-/**
- * @return void
- */
-void Responses::handle_self_message()
-{
-    td_api::object_ptr<td::td_api::message> &msg = update_.message_;
-
-    if (msg->content_->get_id() != td_api::messageText::ID) {
-        /* Skip non text message. */
-        return;
-    }
-
-    std::string &text  = static_cast<td_api::messageText &>(*(msg->content_)).text_->text_;
-    const char  *ctext = text.c_str();
-    size_t      len    = text.length();
-
-    if (handle_shell_exec(ctext, len, handler_, msg, chat_id_)) {
-        return;
-    }
-}
 
 } /* namespace TeaBot */
