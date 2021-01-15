@@ -1,23 +1,29 @@
 
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
-project(TdExample VERSION 1.0 LANGUAGES CXX)
+project(TeaBot VERSION 8.3 LANGUAGES CXX)
 
 find_package(Td 1.7.0 REQUIRED)
 
+include_directories(src)
 
 set(TEABOT_SOURCE
-  src/main.cpp
+  src/TeaBot/main.cpp
   src/TeaBot/TeaBot.cpp
-  src/TeaBot/Responses.cpp
+  src/TeaBot/TeaBot.hpp
 )
 
+set(TDTEABOT_SOURCE
+  src/TDTeaBot/TDTeaBot.cpp
+  src/TDTeaBot/TDTeaBot.hpp
+)
 
-add_library(bbteabot SHARED src/TeaBot/TdLibHandler.cpp)
-target_link_libraries(bbteabot PRIVATE Td::TdStatic)
-target_include_directories(bbteabot PRIVATE td/include)
+add_library(tdteabot SHARED ${TDTEABOT_SOURCE})
+set_property(TARGET tdteabot PROPERTY CXX_STANDARD 14)
+target_link_libraries(tdteabot PRIVATE Td::TdStatic)
+target_include_directories(tdteabot PRIVATE td/include)
 
 add_executable(teabot ${TEABOT_SOURCE})
-target_link_libraries(teabot bbteabot pthread)
 set_property(TARGET teabot PROPERTY CXX_STANDARD 14)
+target_link_libraries(teabot tdteabot pthread curl)
 target_include_directories(teabot PRIVATE td/include)
