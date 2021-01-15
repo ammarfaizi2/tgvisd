@@ -1,39 +1,28 @@
 
 /**
  * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
- * @license MIT
- * @package \TeaBot
+ * @license GPL-v3
+ * @package TDTeaBot
  */
 
-#ifndef __TeaBot__TeaBot_HPP
-#define __TeaBot__TeaBot_HPP
+#ifndef TEABOT__TEABOT_HPP
+#define TEABOT__TEABOT_HPP
 
-#include <cstdint>
-#include <pthread.h>
+#include <TDTeaBot/TDTeaBot.hpp>
 
-#define TEABOT_NUM_OF_THREADS (5)
-#define TEABOT_NUM_OF_QUEUES  (10)
-
-#include "TdLibHandler.hpp"
+using TDTeaBot::TDTeaBot;
 
 namespace TeaBot {
 
 class TeaBot
 {
-private:
-    size_t nthread;
-    TdLibHandler handler_;
-
-    void spawn_response_handler_thread(td_api::updateNewMessage &update);
-
+private:    
+    TDTeaBot tdtb;
 public:
     TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
     ~TeaBot();
-
-    void run();
-    void onUpdateNewMessage(td_api::updateNewMessage &update);
 };
 
 } /* namespace TeaBot */
 
-#endif /* #ifndef __TeaBot__TeaBot_HPP */
+#endif /* #ifndef TEABOT__TEABOT_HPP */
