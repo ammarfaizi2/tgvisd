@@ -24,7 +24,23 @@ MyMessage::MyMessage(std::shared_ptr<Response> res):
  */
 void MyMessage::run()
 {
-    std::cout << to_string(res_->update_) << std::endl;
+    auto &update_ = res_->update_;
+
+    std::cout << to_string(update_) << std::endl;
+    td_api::object_ptr<td::td_api::message> &msg = update_.message_;
+
+    if (msg->content_->get_id() != td_api::messageText::ID) {
+        /* Skip non text message. */
+        return;
+    }
+
+    auto &con = msg->content_;
+
+    std::string &text  = static_cast<td_api::messageText &>(*con).text_->text_;
+    const char  *ctext = text.c_str();
+    size_t      len    = text.length();
+
+    std::cout << text << std::endl;
 }
 
 } /* namespace TeaBot::Responses */

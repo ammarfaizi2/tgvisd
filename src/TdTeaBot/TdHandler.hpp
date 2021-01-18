@@ -60,7 +60,7 @@ private:
 
     void restart();
     uint64_t next_query_id();
-    void handle_event_loop();
+    void handle_event_loop(int timeout);
     void on_authorization_state_update();
     void check_authentication_error(Object object);
     void process_response(td::ClientManager::Response response);
@@ -72,7 +72,7 @@ public:
 
     TdHandler(uint32_t api_id, const char *api_hash, const char *data_path);
 
-    void loop();
+    void loop(int timeout);
     void close();
     void send_query(td_api::object_ptr<td_api::Function> f,
                     std::function<void(Object)> handler);
