@@ -57,7 +57,7 @@ void TdHandler::restart()
  * @return void
  */
 void TdHandler::send_query(td_api::object_ptr<td_api::Function> f, 
-                              std::function<void(Object)> handler)
+                           std::function<void(Object)> handler)
 {
     uint64_t query_id = next_query_id();
 

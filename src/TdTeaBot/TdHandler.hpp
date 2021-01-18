@@ -13,6 +13,7 @@
 #include <td/telegram/td_api.hpp>
 
 #include <mutex>
+#include <thread>
 #include <atomic>
 #include <string>
 #include <memory>
