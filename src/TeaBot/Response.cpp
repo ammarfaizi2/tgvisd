@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <TeaBot/Response.hpp>
+#include <TeaBot/Responses/MyMessage.hpp>
 
 namespace TeaBot {
 
@@ -32,7 +33,25 @@ Response::~Response()
  */
 void Response::run()
 {
-    std::cout << to_string(update_) << std::endl;
+    chat_id_ = update_.message_->chat_id_;
+    td_api::downcast_call(
+        *(update_.message_->sender_),
+        overloaded(
+            [this](td_api::messageSenderUser &user) {
+                sender_id_   = user.user_id_;
+                sender_name_ = handler_->get_user_name(sender_id_);
+            },
+            [this](td_api::messageSenderChat &chat) {
+                sender_id_   = chat.chat_id_;
+                sender_name_ = handler_->get_chat_title(sender_id_);
+            }
+        )
+    );
+
+    if (handler_->get_user_id() == sender_id_) {
+        Responses::MyMessage res(self_);
+        res.run();
+    }
 }
 
 
