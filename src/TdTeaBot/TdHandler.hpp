@@ -76,6 +76,29 @@ public:
     void close();
     void send_query(td_api::object_ptr<td_api::Function> f,
                     std::function<void(Object)> handler);
+
+    inline int32_t get_user_id()
+    {
+        return user_id_;
+    }
+
+    inline std::string get_user_name(int32_t id)
+    {
+        auto it = users_.find(id);
+        if (it == users_.end())
+            return "unknown user";
+
+        return it->second->first_name_+" "+it->second->last_name_;
+    }
+
+    inline std::string get_chat_title(int64_t id)
+    {
+        auto it = chat_title_.find(id);
+        if (it == chat_title_.end())
+            return "";
+
+        return it->second;
+    }
 };
 
 } /* namespace TdTeaBot */

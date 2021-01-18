@@ -18,11 +18,16 @@ namespace TeaBot {
 class Response
 {
 private:
+
+public:
     td_api::updateNewMessage   update_;
     std::shared_ptr<TdHandler> handler_;
     std::shared_ptr<Response>  self_;
 
-public:
+    int64_t chat_id_;
+    int64_t sender_id_;
+    std::string sender_name_;
+
     Response(td_api::updateNewMessage update,
              std::shared_ptr<TdHandler> handler);
 

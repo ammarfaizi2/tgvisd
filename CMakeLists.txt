@@ -13,6 +13,8 @@ set(TEABOT_SOURCE
   src/TeaBot/TeaBot.hpp
   src/TeaBot/Response.cpp
   src/TeaBot/Response.hpp
+  src/TeaBot/Responses/MyMessage.cpp
+  src/TeaBot/Responses/MyMessage.hpp
 )
 
 set(TDTEABOT_SOURCE
