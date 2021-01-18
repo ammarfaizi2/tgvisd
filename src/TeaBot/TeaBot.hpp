@@ -2,7 +2,7 @@
 /**
  * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
  * @license GPL-v3
- * @package TdTeaBot
+ * @package TeaBot
  */
 
 #ifndef TEABOT__TEABOT_HPP
@@ -16,12 +16,15 @@ namespace TeaBot {
 
 class TeaBot
 {
-private:    
+private:
     std::shared_ptr<TdHandler> handler_;
+
+    void updateNewMessage(td_api::updateNewMessage &update);
 
 public:
     TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
     ~TeaBot();
+    void run();
 };
 
 } /* namespace TeaBot */
