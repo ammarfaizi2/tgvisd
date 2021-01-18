@@ -7,18 +7,6 @@ find_package(Td 1.7.0 REQUIRED)
 
 include_directories(src)
 
-set(TEABOT_SOURCE
-  src/TeaBot/main.cpp
-  src/TeaBot/TeaBot.cpp
-  src/TeaBot/TeaBot.hpp
-  src/TeaBot/helpers.cpp
-  src/TeaBot/helpers.hpp
-  src/TeaBot/Response.cpp
-  src/TeaBot/Response.hpp
-  src/TeaBot/Responses/MyMessage.cpp
-  src/TeaBot/Responses/MyMessage.hpp
-)
-
 set(TDTEABOT_SOURCE
   src/TdTeaBot/TdHandler.cpp
   src/TdTeaBot/TdHandler.hpp
@@ -26,14 +14,45 @@ set(TDTEABOT_SOURCE
   src/TdTeaBot/detail.hpp
 )
 
+set(TEABOT_MOD_SHELL_EXEC
+  src/TeaBot/Modules/ShellExec/Module.hpp
+  src/TeaBot/Modules/ShellExec/Module.cpp
+)
+
+set(TEABOT_SOURCE
+  src/TeaBot/Responses/MyMessage.cpp
+  src/TeaBot/Responses/MyMessage.hpp
+
+  src/TeaBot/helpers.cpp
+  src/TeaBot/helpers.hpp
+  src/TeaBot/main.cpp
+  src/TeaBot/Response.cpp
+  src/TeaBot/Response.hpp
+  src/TeaBot/TeaBot.cpp
+  src/TeaBot/TeaBot.hpp
+  src/TeaBot/TeaBotModule.hpp
+)
+
 add_library(tdteabot SHARED ${TDTEABOT_SOURCE})
-set_property(TARGET tdteabot PROPERTY CXX_STANDARD 14)
+set_property(TARGET tdteabot PROPERTY CXX_STANDARD 20)
 target_link_libraries(tdteabot PRIVATE Td::TdStatic)
 target_include_directories(tdteabot PRIVATE td/include)
-target_compile_options(tdteabot PRIVATE -Wall -Wextra -Wno-unused-parameter)
+target_compile_options(tdteabot PRIVATE
+  -pedantic
+  -Wall
+  -Wextra
+  -Wno-unused-parameter
+  -fstack-protector-strong
+)
 
 add_executable(teabot ${TEABOT_SOURCE})
-set_property(TARGET teabot PROPERTY CXX_STANDARD 14)
+set_property(TARGET teabot PROPERTY CXX_STANDARD 20)
 target_link_libraries(teabot tdteabot pthread curl)
 target_include_directories(teabot PRIVATE td/include)
-target_compile_options(teabot PRIVATE -Wall -Wextra -Wno-unused-parameter)
+target_compile_options(teabot PRIVATE
+  -pedantic
+  -Wall
+  -Wextra
+  -Wno-unused-parameter
+  -fstack-protector-strong
+)
