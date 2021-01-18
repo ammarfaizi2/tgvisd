@@ -92,11 +92,18 @@ void TeaBot::run()
  */
 void TeaBot::updateNewMessage(td_api::updateNewMessage &update)
 {
+    td_api::object_ptr<td::td_api::message> &msg = update.message_;
+
+    if (msg->content_->get_id() != td_api::messageText::ID) {
+        /* Skip non text message. */
+        return;
+    }
+
     std::shared_ptr<Response> resObj {
         std::make_shared<Response>(std::move(update), handler_)
     };
-    resObj->setSelfPtr(resObj);
 
+    resObj->setSelfPtr(resObj);
     std::thread resThread(&Response::run, resObj);
     resThread.detach();
 }
