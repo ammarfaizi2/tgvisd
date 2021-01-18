@@ -32,13 +32,14 @@ public:
             return false;
 
         ctext += 3;
+        len   -= 4;
         Module mod(res);
-        mod.run(ctext);
+        mod.run(ctext, len);
 
         return true;
     }
 
-    void run(const char *cmd);
+    void run(const char *cmd, size_t len);
     inline Module(std::shared_ptr<Response> &res):
         TeaBotModule(res)
     {}

@@ -6,6 +6,7 @@
  */
 #include <cstdio>
 #include <errno.h>
+#include <TeaBot/helpers.hpp>
 #include <TeaBot/Modules/ShellExec/Module.hpp>
 
 namespace TeaBot::Modules::ShellExec {
@@ -33,13 +34,26 @@ ret:
     }
 }
 
+#define SHELL_WRAP_STR "exec /usr/bin/bash -c "
+
 /**
  * @param const char *cmd
+ * @param size_t     len
  * @return void
  */
-void Module::run(const char *cmd)
+void Module::run(const char *cmd, size_t len)
 {
-    std::string cmd_output = shell_exec(cmd);
+    size_t wraped_len   = (len * 4) + sizeof(SHELL_WRAP_STR);
+    char   *wrapped_cmd = new char[wraped_len + sizeof("2>&1") + 1];
+    char   *escaped_cmd = new char[len * 4];
+
+    strcpy(wrapped_cmd, SHELL_WRAP_STR);
+    strcat(wrapped_cmd, escapeshellarg(escaped_cmd, cmd, len));
+    strcat(wrapped_cmd, " 2>&1");
+
+    delete[] escaped_cmd;
+    std::string cmd_output = std::move(shell_exec(wrapped_cmd));
+    delete[] wrapped_cmd;
 
     auto &update_ = res_->update_;
     td_api::object_ptr<td::td_api::message> &msg = update_.message_;
