@@ -69,15 +69,6 @@ void TdHandler::send_query(td_api::object_ptr<td_api::Function> f,
 
 
 /**
- * @return uint64_t
- */
-uint64_t TdHandler::next_query_id()
-{
-    return ++current_query_id_;
-}
-
-
-/**
  * @param timeout
  * @return void
  */

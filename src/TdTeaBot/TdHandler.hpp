@@ -59,13 +59,17 @@ private:
     std::mutex on_auth_update_mutex;
 
     void restart();
-    uint64_t next_query_id();
     void handle_event_loop(int timeout);
     void on_authorization_state_update();
     void check_authentication_error(Object object);
     void process_response(td::ClientManager::Response response);
     void process_update(td_api::object_ptr<td_api::Object> update);
     std::function<void(Object object)> create_authentication_query_handler();
+
+    inline uint64_t next_query_id()
+    {
+        return ++current_query_id_;
+    }
 
 public:
     Callback callback;

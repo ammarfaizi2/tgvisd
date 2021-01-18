@@ -11,8 +11,6 @@
 
 namespace TeaBot::Responses {
 
-#include <TeaBot/Responses/MyMessage/Template.hpp>
-
 /**
  * @param std::shared_ptr<Response> res
  */
@@ -35,10 +33,6 @@ void MyMessage::run()
         /* Skip non text message. */
         return;
     }
-
-
-    MyMessageHandler handler(res_);
-    handler.run();
 }
 
 } /* namespace TeaBot::Responses */
