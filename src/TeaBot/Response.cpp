@@ -5,6 +5,7 @@
  * @package TeaBot
  */
 
+#include <iostream>
 #include <TeaBot/Response.hpp>
 
 namespace TeaBot {
@@ -31,7 +32,7 @@ Response::~Response()
  */
 void Response::run()
 {
-    
+    std::cout << to_string(update_) << std::endl;
 }
 
 
