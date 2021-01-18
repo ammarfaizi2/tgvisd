@@ -18,7 +18,6 @@ inline static std::string shell_exec(const char *cmd)
     char    out[8096];
     size_t  outlen  = 0;
     FILE    *handle = popen(cmd, "r");
-
     if (handle == NULL) {
         outlen = (size_t)snprintf(out, sizeof(out), "Error: %s",
                                   strerror(errno));
@@ -26,7 +25,6 @@ inline static std::string shell_exec(const char *cmd)
     }
     outlen = fread(out, sizeof(char), sizeof(out), handle);
     pclose(handle);
-
 ret:
     {
         std::string ret;
@@ -49,7 +47,7 @@ void Module::run(const char *cmd)
     auto emsg = td_api::make_object<td_api::editMessageText>();
     auto imt  = td_api::make_object<td_api::inputMessageText>();
 
-    imt->text_ = td_api::make_object<td_api::formattedText>();
+    imt->text_        = td_api::make_object<td_api::formattedText>();
     imt->text_->text_ = std::move(cmd_output);
     emsg->chat_id_    = res_->chat_id_;
     emsg->message_id_ = msg->id_;
