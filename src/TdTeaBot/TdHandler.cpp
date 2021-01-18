@@ -78,9 +78,10 @@ uint64_t TdHandler::next_query_id()
 
 
 /**
+ * @param timeout
  * @return void
  */
-void TdHandler::loop()
+void TdHandler::loop(int timeout)
 {
     if (need_restart_) {
         restart();
@@ -92,17 +93,16 @@ void TdHandler::loop()
         return;
     }
 
-    handle_event_loop();
+    handle_event_loop(timeout);
 }
 
 
 /**
+ * @param timeout
  * @return bool
  */
-void TdHandler::handle_event_loop()
+void TdHandler::handle_event_loop(int timeout)
 {
-    const int timeout = 2; /* In seconds. */
-
     while (true) {
         auto response = client_manager_->receive(timeout);
 
@@ -346,7 +346,7 @@ void TdHandler::close()
 {
     send_query(td_api::make_object<td_api::close>(), {});
     std::cout << "Waiting for authorizationStateClosed..." << std::endl;
-    handle_event_loop();
+    handle_event_loop(5);
 }
 
 } /* namespace TdTeaBot */

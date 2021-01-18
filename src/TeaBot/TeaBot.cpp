@@ -75,13 +75,16 @@ TeaBot::~TeaBot()
  */
 void TeaBot::run()
 {
+    const int timeout = 1;
+
     while (true) {
 
 #if defined(__linux__)
         if (is_signaled)
             break;
 #endif
-        handler_->loop();
+
+        handler_->loop(timeout);
     }
 }
 
