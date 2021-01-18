@@ -5,6 +5,8 @@
  * @package TeaBot
  */
 
+#include <iostream>
+#include <unistd.h>
 #include <TeaBot/Responses/MyMessage.hpp>
 
 namespace TeaBot::Responses {
@@ -22,7 +24,7 @@ MyMessage::MyMessage(std::shared_ptr<Response> res):
  */
 void MyMessage::run()
 {
-
+    std::cout << to_string(res_->update_) << std::endl;
 }
 
 } /* namespace TeaBot::Responses */
