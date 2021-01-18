@@ -11,11 +11,16 @@ set(TEABOT_SOURCE
   src/TeaBot/main.cpp
   src/TeaBot/TeaBot.cpp
   src/TeaBot/TeaBot.hpp
+
+  src/TeaThread/TeaThread.cpp
+  src/TeaThread/TeaThread.hpp
 )
 
 set(TDTEABOT_SOURCE
-  src/TDTeaBot/TDTeaBot.cpp
-  src/TDTeaBot/TDTeaBot.hpp
+  src/TdTeaBot/TdHandler.cpp
+  src/TdTeaBot/TdHandler.hpp
+  src/TdTeaBot/Callback.hpp
+  src/TdTeaBot/detail.hpp
 )
 
 add_library(tdteabot SHARED ${TDTEABOT_SOURCE})
