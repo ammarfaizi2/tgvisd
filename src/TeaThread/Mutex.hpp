@@ -10,6 +10,7 @@ class Mutex
 {
 private:
     pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 public:
     int lock()
     {
