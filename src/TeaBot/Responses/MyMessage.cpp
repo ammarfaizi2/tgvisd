@@ -61,9 +61,6 @@ inline static bool is_cmd_format(const char *ctext, size_t len)
  */
 void MyMessage::handle_text_message()
 {
-    auto &update_ = res_->update_;
-    std::cout << to_string(update_) << std::endl;
-
     const std::string &text  = res_->getText();
     const char        *ctext = text.c_str();
     size_t            len    = text.size();
