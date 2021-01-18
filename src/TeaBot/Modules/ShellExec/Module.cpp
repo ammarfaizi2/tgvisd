@@ -11,15 +11,6 @@
 namespace TeaBot::Modules::ShellExec {
 
 /**
- * @param std::shared_ptr<Response> &res
- */
-Module::Module(std::shared_ptr<Response> &res):
-    TeaBotModule(res)
-{
-
-}
-
-/**
  * @return const char *
  */
 inline static std::string shell_exec(const char *cmd)

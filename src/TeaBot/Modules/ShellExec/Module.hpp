@@ -28,12 +28,10 @@ public:
             return false;
 
         ctext++;
-
         if (memcmp(ctext, "sh ", 3) != 0)
             return false;
 
         ctext += 3;
-
         Module mod(res);
         mod.run(ctext);
 
@@ -41,7 +39,9 @@ public:
     }
 
     void run(const char *cmd);
-    Module(std::shared_ptr<Response> &res);
+    inline Module(std::shared_ptr<Response> &res):
+        TeaBotModule(res)
+    {}
 };
 
 } /* namespace TeaBot::Modules::ShellExec */
