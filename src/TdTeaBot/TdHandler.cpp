@@ -42,7 +42,12 @@ TdHandler::TdHandler(uint32_t api_id, const char *api_hash,
 void TdHandler::restart()
 {
     client_manager_.reset();
-    *this = TdHandler(api_id_, api_hash_, data_path_);
+
+    closed_                  = false;
+    need_restart_            = false;
+    are_authorized_          = false;
+    current_query_id_        = 0;
+    authentication_query_id_ = 0;
 }
 
 
@@ -68,11 +73,7 @@ void TdHandler::send_query(td_api::object_ptr<td_api::Function> f,
  */
 uint64_t TdHandler::next_query_id()
 {
-    uint64_t ret;
-    pthread_mutex_lock(&query_id_mutex);
-    ret = ++current_query_id_;
-    pthread_mutex_unlock(&query_id_mutex);
-    return ret;
+    return ++current_query_id_;
 }
 
 
@@ -179,7 +180,7 @@ void TdHandler::process_update(td_api::object_ptr<td_api::Object> update)
  */
 void TdHandler::on_authorization_state_update()
 {
-    pthread_mutex_lock(&on_auth_update_mutex);
+    on_auth_update_mutex.lock();
     authentication_query_id_++;
     td_api::downcast_call(
         *authorization_state_,
@@ -305,7 +306,7 @@ void TdHandler::on_authorization_state_update()
             [this](auto &){}
         )
     );
-    pthread_mutex_unlock(&on_auth_update_mutex);
+    on_auth_update_mutex.unlock();
 }
 
 
@@ -318,8 +319,8 @@ void TdHandler::on_authorization_state_update()
 std::function<void(Object object)>
 TdHandler::create_authentication_query_handler()
 {
-    return [this, id = authentication_query_id_](Object object) {
-        if (id == authentication_query_id_) {
+    return [this, id = authentication_query_id_.load()](Object object) {
+        if (id == authentication_query_id_.load()) {
             check_authentication_error(std::move(object));
         }
     };
