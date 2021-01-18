@@ -20,6 +20,16 @@ Response::Response(td_api::updateNewMessage update,
     update_(std::move(update)),
     handler_(handler)
 {
+
+    auto &update_ = this->update_;
+    auto &message = update_.message_;
+    auto &content = message->content_;
+
+    switch (message->content_->get_id()) {
+        case td_api::messageText::ID:
+            text_ = static_cast<td_api::messageText &>(*content).text_->text_;
+            break;
+    }
 }
 
 

@@ -26,6 +26,7 @@ public:
 
     int64_t chat_id_;
     int64_t sender_id_;
+    std::string text_;
     std::string sender_name_;
 
     Response(td_api::updateNewMessage update,
@@ -34,6 +35,10 @@ public:
     ~Response();
 
     void run();
+    inline const std::string &getText() const
+    {
+        return text_;
+    }
 
     inline void setSelfPtr(std::shared_ptr<Response> self)
     {

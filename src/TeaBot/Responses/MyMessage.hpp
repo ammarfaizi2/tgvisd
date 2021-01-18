@@ -19,6 +19,7 @@ class MyMessage
 private:
     std::shared_ptr<Response> res_;
 
+    void handle_text_message();
 public:
     MyMessage(std::shared_ptr<Response> res);
     void run();

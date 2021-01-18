@@ -31,6 +31,8 @@ set(TEABOT_SOURCE
   src/TeaBot/TeaBot.cpp
   src/TeaBot/TeaBot.hpp
   src/TeaBot/TeaBotModule.hpp
+
+  ${TEABOT_MOD_SHELL_EXEC}
 )
 
 add_library(tdteabot SHARED ${TDTEABOT_SOURCE})
