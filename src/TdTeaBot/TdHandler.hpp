@@ -82,7 +82,7 @@ public:
         return user_id_;
     }
 
-    inline std::string get_user_name(int32_t id)
+    inline const std::string get_user_name(int32_t id) const
     {
         auto it = users_.find(id);
         if (it == users_.end())
@@ -91,7 +91,7 @@ public:
         return it->second->first_name_+" "+it->second->last_name_;
     }
 
-    inline std::string get_chat_title(int64_t id)
+    inline const std::string get_chat_title(int64_t id) const
     {
         auto it = chat_title_.find(id);
         if (it == chat_title_.end())
