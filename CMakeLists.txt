@@ -11,6 +11,8 @@ set(TEABOT_SOURCE
   src/TeaBot/main.cpp
   src/TeaBot/TeaBot.cpp
   src/TeaBot/TeaBot.hpp
+  src/TeaBot/helpers.cpp
+  src/TeaBot/helpers.hpp
   src/TeaBot/Response.cpp
   src/TeaBot/Response.hpp
   src/TeaBot/Responses/MyMessage.cpp
