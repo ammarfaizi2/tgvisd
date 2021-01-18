@@ -11,6 +11,8 @@
 
 namespace TeaBot::Responses {
 
+#include <TeaBot/Responses/MyMessage/Template.hpp>
+
 /**
  * @param std::shared_ptr<Response> res
  */
@@ -34,13 +36,9 @@ void MyMessage::run()
         return;
     }
 
-    auto &con = msg->content_;
 
-    std::string &text  = static_cast<td_api::messageText &>(*con).text_->text_;
-    const char  *ctext = text.c_str();
-    size_t      len    = text.length();
-
-    std::cout << text << std::endl;
+    MyMessageHandler handler(res_);
+    handler.run();
 }
 
 } /* namespace TeaBot::Responses */
