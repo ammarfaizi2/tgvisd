@@ -10,14 +10,14 @@
 #include <TeaBot/helpers.hpp>
 
 /** 
- * @param char *alloc
- * @param char *str
+ * @param char       *alloc
+ * @param const char *str
  * @retur char *
  */
-char *escapeshellarg(char *alloc, char *str)
+char *escapeshellarg(char *alloc, const char *str, size_t len)
 {
   size_t y     = 0;
-  size_t l     = strlen(str);
+  size_t l     = (len > 0) ? len : strlen(str);
   size_t x;
   char   *cmd;
 

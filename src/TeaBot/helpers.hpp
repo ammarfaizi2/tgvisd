@@ -8,6 +8,6 @@
 #ifndef TEABOT__HELPERS_HPP
 #define TEABOT__HELPERS_HPP
 
-char *escapeshellarg(char *alloc, char *str);
+char *escapeshellarg(char *alloc, const char *str, size_t len);
 
 #endif /* #ifndef TEABOT__HELPERS_HPP */
