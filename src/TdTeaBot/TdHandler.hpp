@@ -12,8 +12,8 @@
 #include <td/telegram/td_api.h>
 #include <td/telegram/td_api.hpp>
 
-#include <pthread.h>
-
+#include <mutex>
+#include <atomic>
 #include <string>
 #include <memory>
 #include <cstdint>
@@ -43,8 +43,8 @@ private:
 
     int32_t user_id_{0};
     int32_t client_id_{0};
-    uint64_t current_query_id_{0};
-    uint64_t authentication_query_id_{0};
+    std::atomic<uint64_t> current_query_id_{0};
+    std::atomic<uint64_t> authentication_query_id_{0};
 
     using Object = td_api::object_ptr<td_api::Object>;
 
@@ -55,8 +55,7 @@ private:
     std::unordered_map<uint64_t, std::function<void(Object)>> handlers_;
     std::unordered_map<int32_t, td_api::object_ptr<td_api::user>> users_;
 
-    pthread_mutex_t query_id_mutex       = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t on_auth_update_mutex = PTHREAD_MUTEX_INITIALIZER;
+    std::mutex on_auth_update_mutex;
 
     void restart();
     uint64_t next_query_id();
@@ -66,6 +65,7 @@ private:
     void process_response(td::ClientManager::Response response);
     void process_update(td_api::object_ptr<td_api::Object> update);
     std::function<void(Object object)> create_authentication_query_handler();
+
 public:
     Callback callback;
 
