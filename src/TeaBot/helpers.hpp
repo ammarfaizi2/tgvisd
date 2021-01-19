@@ -8,6 +8,13 @@
 #ifndef TEABOT__HELPERS_HPP
 #define TEABOT__HELPERS_HPP
 
-char *escapeshellarg(char *alloc, const char *str, size_t len);
+#include <string>
+
+char *escapeshellarg(char *alloc, const char *str, size_t len, size_t *res_len);
+std::string shell_exec(const char *cmd);
+char *trim(char *str);
+char *trim_len(char *str, size_t len);
+char *trim_len_cpy(char *str, size_t len, size_t *res_len);
+char *trim_cpy(char *str);
 
 #endif /* #ifndef TEABOT__HELPERS_HPP */

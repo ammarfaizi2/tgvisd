@@ -7,7 +7,7 @@
 
 #include <iostream>
 #include <unistd.h>
-#include <TeaBot/Responses/MyMessage.hpp>
+#include <TeaBot/Responses/Message.hpp>
 
 #include <TeaBot/Modules/ShellExec/Module.hpp>
 #include <TeaBot/Modules/Sed/Module.hpp>
@@ -19,7 +19,7 @@ namespace TeaBot::Responses {
 /**
  * @param std::shared_ptr<Response> res
  */
-MyMessage::MyMessage(std::shared_ptr<Response> res):
+Message::Message(std::shared_ptr<Response> res):
     res_(res)
 {
 }
@@ -27,7 +27,7 @@ MyMessage::MyMessage(std::shared_ptr<Response> res):
 /**
  * @return void
  */
-void MyMessage::run()
+void Message::run()
 {
     auto &update_ = res_->update_;
     td_api::object_ptr<td::td_api::message> &msg = update_.message_;
@@ -60,7 +60,7 @@ inline static bool is_cmd_format(const char *ctext, size_t len)
 /**
  * @return void
  */
-void MyMessage::handle_text_message()
+void Message::handle_text_message()
 {
     const std::string &text  = res_->getText();
     const char        *ctext = text.c_str();

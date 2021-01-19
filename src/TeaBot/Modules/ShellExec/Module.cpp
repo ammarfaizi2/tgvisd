@@ -11,29 +11,6 @@
 
 namespace TeaBot::Modules::ShellExec {
 
-/**
- * @return const char *
- */
-inline static std::string shell_exec(const char *cmd)
-{
-    char    out[8096];
-    size_t  outlen  = 0;
-    FILE    *handle = popen(cmd, "r");
-    if (handle == NULL) {
-        outlen = (size_t)snprintf(out, sizeof(out), "Error: %s",
-                                  strerror(errno));
-        goto ret;
-    }
-    outlen = fread(out, sizeof(char), sizeof(out), handle);
-    pclose(handle);
-ret:
-    {
-        std::string ret;
-        ret.assign(out, outlen);
-        return ret;
-    }
-}
-
 #define SHELL_WRAP_STR "exec /usr/bin/bash -c "
 
 /**
@@ -43,30 +20,46 @@ ret:
  */
 void Module::run(const char *cmd, size_t len)
 {
-    size_t wraped_len   = (len * 4) + sizeof(SHELL_WRAP_STR);
-    char   *wrapped_cmd = new char[wraped_len + sizeof("2>&1") + 1];
-    char   *escaped_cmd = new char[len * 4];
+    size_t escaped_len  = 0;
+    size_t wrapped_len  = sizeof(SHELL_WRAP_STR) + (len * 4) + sizeof(" 2>&1");
+    char   *wrapped_cmd = new char[wrapped_len];
+    char   *comp_ptr    = wrapped_cmd;
 
-    strcpy(wrapped_cmd, SHELL_WRAP_STR);
-    strcat(wrapped_cmd, escapeshellarg(escaped_cmd, cmd, len));
-    strcat(wrapped_cmd, " 2>&1");
+    memcpy(comp_ptr, SHELL_WRAP_STR, sizeof(SHELL_WRAP_STR) - 1);
+    comp_ptr += sizeof(SHELL_WRAP_STR) - 1;
+    comp_ptr  = escapeshellarg(comp_ptr, cmd, len, &escaped_len);
+    comp_ptr  = trim_len_cpy(comp_ptr, escaped_len, &escaped_len);
+    comp_ptr += escaped_len;
+    memcpy(comp_ptr, " 2>&1", 6);
 
-    delete[] escaped_cmd;
-    std::string cmd_output = std::move(shell_exec(wrapped_cmd));
+    std::string cmd_out = std::move(shell_exec(wrapped_cmd));
     delete[] wrapped_cmd;
 
-    auto &update_ = res_->update_;
-    td_api::object_ptr<td::td_api::message> &msg = update_.message_;
+    size_t out_len = cmd_out.size();
 
-    auto emsg = td_api::make_object<td_api::editMessageText>();
-    auto imt  = td_api::make_object<td_api::inputMessageText>();
+    if (out_len == 0) {
+        cmd_out = "~";
+    }
 
-    imt->text_        = td_api::make_object<td_api::formattedText>();
-    imt->text_->text_ = std::move(cmd_output);
+    auto &update_  = res_->update_;
+    auto &msg      = update_.message_;
+    auto emsg      = td_api::make_object<td_api::editMessageText>();
+    auto imt       = td_api::make_object<td_api::inputMessageText>();
+
+    /* Text formatting. */
+    auto pre       = td_api::make_object<td_api::textEntityTypePreCode>();
+    auto prer      = td::move_tl_object_as<td_api::TextEntityType>(pre);
+    auto text_ent  = td_api::make_object<td_api::textEntity>(0, out_len,
+                        std::move(prer));
+    auto entities  = std::vector<decltype(text_ent)>();
+    entities.push_back(std::move(text_ent));
+    auto text      = td_api::make_object<td_api::formattedText>(cmd_out,
+                        std::move(entities));
+
+    imt->text_        = std::move(text);
     emsg->chat_id_    = res_->chat_id_;
     emsg->message_id_ = msg->id_;
     emsg->input_message_content_ = std::move(imt);
-
     res_->handler_->send_query(std::move(emsg), {});
 }
 
