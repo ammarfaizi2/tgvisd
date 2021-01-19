@@ -43,7 +43,7 @@ public:
             ctext += 3;
             len   -= 4;
         } else
-        if (memcmp(ctext, "shp ", 4) == 0) {
+        if (memcmp(ctext, "shr ", 4) == 0) {
             ctext += 4;
             len   -= 5;
             edit_msg_ = false;

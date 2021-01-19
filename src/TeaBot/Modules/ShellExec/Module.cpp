@@ -4,6 +4,7 @@
  * @license GPL-v3
  * @package TeaBot
  */
+#include <iostream>
 #include <cstdio>
 #include <errno.h>
 #include <TeaBot/helpers.hpp>
@@ -36,14 +37,8 @@ void Module::run(const char *cmd, size_t len)
     delete[] wrapped_cmd;
 
     size_t out_len = cmd_out.size();
-
-    if (out_len == 0) {
-        cmd_out = "~";
-    }
-
     auto &update_  = res_->update_;
     auto &msg      = update_.message_;
-    auto emsg      = td_api::make_object<td_api::editMessageText>();
     auto imt       = td_api::make_object<td_api::inputMessageText>();
 
     /* Text formatting. */
@@ -55,12 +50,21 @@ void Module::run(const char *cmd, size_t len)
     entities.push_back(std::move(text_ent));
     auto text      = td_api::make_object<td_api::formattedText>(cmd_out,
                         std::move(entities));
+    imt->text_     = std::move(text);
 
-    imt->text_        = std::move(text);
-    emsg->chat_id_    = res_->chat_id_;
-    emsg->message_id_ = msg->id_;
-    emsg->input_message_content_ = std::move(imt);
-    res_->handler_->send_query(std::move(emsg), {});
+    if (edit_msg_) {
+        auto rmsg         = td_api::make_object<td_api::editMessageText>();
+        rmsg->chat_id_    = res_->chat_id_;
+        rmsg->message_id_ = msg->id_;
+        rmsg->input_message_content_ = std::move(imt);
+        res_->handler_->send_query(std::move(rmsg), {});
+    } else {
+        auto rmsg         = td_api::make_object<td_api::sendMessage>();
+        rmsg->chat_id_    = res_->chat_id_;
+        rmsg->reply_to_message_id_ = msg->id_;
+        rmsg->input_message_content_ = std::move(imt);
+        res_->handler_->send_query(std::move(rmsg), {});
+    }
 }
 
 } /* namespace TeaBot::Modules::ShellExec */
