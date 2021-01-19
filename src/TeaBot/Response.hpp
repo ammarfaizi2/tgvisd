@@ -24,6 +24,7 @@ public:
     std::shared_ptr<TdHandler> handler_;
     std::shared_ptr<Response>  self_;
 
+    bool is_self_msg_ = false;
     int64_t chat_id_;
     int64_t sender_id_;
     std::string text_;

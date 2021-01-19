@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <TeaBot/Response.hpp>
+#include <TeaBot/Responses/Message.hpp>
 #include <TeaBot/Responses/MyMessage.hpp>
 
 namespace TeaBot {
@@ -58,8 +59,13 @@ void Response::run()
         )
     );
 
-    if (handler_->get_user_id() == sender_id_) {
+    is_self_msg_ = (handler_->get_user_id() == sender_id_);
+
+    if (is_self_msg_) {
         Responses::MyMessage res(self_);
+        res.run();
+    } else {
+        Responses::Message res(self_);
         res.run();
     }
 }
