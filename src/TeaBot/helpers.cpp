@@ -77,6 +77,8 @@ char *escapeshellarg(char *alloc, const char *str, size_t len, size_t *res_len)
     return cmd;
 }
 
+#define HEQ(C) ((*head) == (C))
+#define TEQ(C) ((*tail) == (C))
 
 /**
  * @param char *str
@@ -84,62 +86,64 @@ char *escapeshellarg(char *alloc, const char *str, size_t len, size_t *res_len)
  * @param size_t *res_ken
  * @return char *
  */
-char *trim_len(char *str, size_t len, size_t *res_len)
+char *trim_len(char *head, size_t len, size_t *res_len)
 {
-    bool   move = false;
-    char   *end = &(str[len - 1]);
+    char *tail  = &(head[len - 1]);
+    bool move_t = false;
 
-    while (*str == ' ' || *str == '\n' || *str == '\r') {
-        str++;
-        len--;
-        move = true;
-    }
-
-    while (*end == ' ' || *end == '\n' || *end == '\r') {
-        end--;
+    while ((len > 0) && (HEQ(' ') || HEQ('\n') || HEQ('\r') || HEQ('\v'))) {
+        head++;
         len--;
     }
+
+    while ((len > 0) && (TEQ(' ') || TEQ('\n') || TEQ('\r') || TEQ('\v'))) {
+        tail--;
+        len--;
+        move_t = true;
+    }
+
+    if ((len > 0) && move_t)
+        *(tail + 1) = '\0';
 
     if (res_len != NULL)
         *res_len = len;
 
-    if (move)
-        *(end + 1) = '\0';
-
-    return str;
+    return head;
 }
 
 
 /**
- * @param char *str
+ * @param char   *head
  * @param size_t len
  * @param size_t *res_ken
  * @return char *
  */
-char *trim_len_cpy(char *str, size_t len, size_t *res_len)
+char *trim_len_cpy(char *head, size_t len, size_t *res_len)
 {
-    bool   move   = false;
-    char   *end   = &(str[len - 1]);
-    char   *start = str;
+    char *start = head;
+    char *tail  = &(head[len - 1]);
+    bool move_h = false;
 
-    while (*str == ' ' || *str == '\n' || *str == '\r') {
-        str++;
+    while ((len > 0) && (HEQ(' ') || HEQ('\n') || HEQ('\r') || HEQ('\v'))) {
+        head++;
         len--;
-        move = true;
+        move_h = true;
     }
 
-    while (*end == ' ' || *end == '\n' || *end == '\r') {
-        end--;
+    while ((len > 0) && (TEQ(' ') || TEQ('\n') || TEQ('\r') || TEQ('\v'))) {
+        tail--;
         len--;
+    }
+
+    if (move_h) {
+        if (len > 0)
+            memmove(start, head, len);
+
+        *(start + len) = '\0';
     }
 
     if (res_len != NULL)
         *res_len = len;
-
-    if (move) {
-        *(start + len) = '\0';
-        return (char *)memmove(start, str, len);
-    }
 
     return start;
 }
@@ -192,8 +196,12 @@ std::string shell_exec(const char *cmd)
     pclose(handle);
     outret = trim_len(out, outlen, &outlen);
 
+    if (outlen == 0)
+        return "~";
+
 ret:
     {
+        fflush(stdout);
         std::string ret;
         ret.assign(outret, outlen);
         return ret;
