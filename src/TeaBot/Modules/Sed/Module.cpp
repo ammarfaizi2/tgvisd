@@ -93,7 +93,7 @@ void Module::run(const char *pat, size_t len)
     cmd += esc_len;
     memcpy(cmd, " 2>&1", sizeof(" 2>&1"));
 
-    std::string reply = "Sed output:\n\n";
+    std::string reply = "Sed output:\n";
     reply.reserve(16 + (crep_len * 2) + 4096);
     reply += shell_exec(heap);
     delete[] heap;
