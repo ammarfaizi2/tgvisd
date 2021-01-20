@@ -9,9 +9,10 @@
 #include <unistd.h>
 #include <TeaBot/Responses/MyMessage.hpp>
 
-#include <TeaBot/Modules/ShellExec/Module.hpp>
-#include <TeaBot/Modules/Sed/Module.hpp>
+#include <TeaBot/Modules/Debug/Module.hpp>
 #include <TeaBot/Modules/Mock/Module.hpp>
+#include <TeaBot/Modules/Sed/Module.hpp>
+#include <TeaBot/Modules/ShellExec/Module.hpp>
 
 #define TeaModules TeaBot::Modules
 
@@ -68,13 +69,16 @@ void MyMessage::handle_text_message()
     size_t            len    = text.size();
 
     if (is_cmd_format(ctext, len)) {
-        if (TeaModules::ShellExec::Module::match(res_))
+        if (TeaModules::Debug::Module::match(res_))
+            return;
+
+        if (TeaModules::Mock::Module::match(res_))
             return;
 
         if (TeaModules::Sed::Module::match(res_))
             return;
 
-        if (TeaModules::Mock::Module::match(res_))
+        if (TeaModules::ShellExec::Module::match(res_))
             return;
     }
 }

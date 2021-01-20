@@ -61,8 +61,6 @@ bool Module::check_replied_msg()
 /**
  * @return void
  */
-#define PRINT_CMD "printf \"%s\" "
-#define SED_CMD   " | sed -r "
 void Module::run()
 {
     if (!check_replied_msg())
