@@ -14,9 +14,14 @@ set(TDTEABOT_SOURCE
   src/TdTeaBot/detail.hpp
 )
 
-set(TEABOT_MOD_SHELLEXEC
-  src/TeaBot/Modules/ShellExec/Module.hpp
-  src/TeaBot/Modules/ShellExec/Module.cpp
+set(TEABOT_MOD_DEBUG
+  src/TeaBot/Modules/Debug/Module.hpp
+  src/TeaBot/Modules/Debug/Module.cpp
+)
+
+set(TEABOT_MOD_MOCK
+  src/TeaBot/Modules/Mock/Module.hpp
+  src/TeaBot/Modules/Mock/Module.cpp
 )
 
 set(TEABOT_MOD_SED
@@ -24,9 +29,9 @@ set(TEABOT_MOD_SED
   src/TeaBot/Modules/Sed/Module.cpp
 )
 
-set(TEABOT_MOD_MOCK
-  src/TeaBot/Modules/Mock/Module.hpp
-  src/TeaBot/Modules/Mock/Module.cpp
+set(TEABOT_MOD_SHELLEXEC
+  src/TeaBot/Modules/ShellExec/Module.hpp
+  src/TeaBot/Modules/ShellExec/Module.cpp
 )
 
 set(TEABOT_SOURCE
@@ -44,9 +49,10 @@ set(TEABOT_SOURCE
   src/TeaBot/TeaBot.hpp
   src/TeaBot/TeaBotModule.hpp
 
-  ${TEABOT_MOD_SHELLEXEC}
-  ${TEABOT_MOD_SED}
+  ${TEABOT_MOD_DEBUG}
   ${TEABOT_MOD_MOCK}
+  ${TEABOT_MOD_SED}
+  ${TEABOT_MOD_SHELLEXEC}
 )
 
 set(TEABOT_TEST
