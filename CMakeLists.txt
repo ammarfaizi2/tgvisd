@@ -24,6 +24,11 @@ set(TEABOT_MOD_SED
   src/TeaBot/Modules/Sed/Module.cpp
 )
 
+set(TEABOT_MOD_MOCK
+  src/TeaBot/Modules/Mock/Module.hpp
+  src/TeaBot/Modules/Mock/Module.cpp
+)
+
 set(TEABOT_SOURCE
   src/TeaBot/Responses/Message.cpp
   src/TeaBot/Responses/Message.hpp
@@ -41,6 +46,7 @@ set(TEABOT_SOURCE
 
   ${TEABOT_MOD_SHELLEXEC}
   ${TEABOT_MOD_SED}
+  ${TEABOT_MOD_MOCK}
 )
 
 set(TEABOT_TEST

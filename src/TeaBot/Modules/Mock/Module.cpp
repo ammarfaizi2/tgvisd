@@ -2,16 +2,16 @@
 /**
  * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
  * @license GPL-v3
- * @package TeaBot::Modules::Sed
+ * @package TeaBot::Modules::Mock
  */
 
 #include <iostream>
 #include <cstdio>
 #include <errno.h>
 #include <TeaBot/helpers.hpp>
-#include <TeaBot/Modules/Sed/Module.hpp>
+#include <TeaBot/Modules/Mock/Module.hpp>
 
-namespace TeaBot::Modules::Sed {
+namespace TeaBot::Modules::Mock {
 
 /**
  * @return bool
@@ -59,24 +59,33 @@ bool Module::check_replied_msg()
 }
 
 /**
- * @param const char *pat
- * @param size_t     len
  * @return void
  */
 #define PRINT_CMD "printf \"%s\" "
 #define SED_CMD   " | sed -r "
-void Module::run(const char *pat, size_t len)
+void Module::run()
 {
     if (!check_replied_msg())
         return;
 
-    size_t alloc = 0; /* Heap allocation size. */
-    size_t esc_len = 0;
-
     const char *crep      = replied_text_.c_str();
     size_t      crep_len  = replied_text_.size();
 
+    mock_string((char *)crep, crep_len);
+
+    auto &update_  = res_->update_;
+    auto &msg      = update_.message_;
+    auto imt       = td_api::make_object<td_api::inputMessageText>();
+    auto text      = td_api::make_object<td_api::formattedText>();
+    text->text_    = std::move(replied_text_);
+    imt->text_     = std::move(text);
+
+    auto rmsg         = td_api::make_object<td_api::editMessageText>();
+    rmsg->chat_id_    = res_->chat_id_;
+    rmsg->message_id_ = msg->id_;
+    rmsg->input_message_content_ = std::move(imt);
+    res_->handler_->send_query(std::move(rmsg), {});
 }
 
-} /* namespace TeaBot::Modules::Sed */
+} /* namespace TeaBot::Modules::Mock */
 

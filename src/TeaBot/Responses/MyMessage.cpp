@@ -11,6 +11,7 @@
 
 #include <TeaBot/Modules/ShellExec/Module.hpp>
 #include <TeaBot/Modules/Sed/Module.hpp>
+#include <TeaBot/Modules/Mock/Module.hpp>
 
 #define TeaModules TeaBot::Modules
 
@@ -71,6 +72,9 @@ void MyMessage::handle_text_message()
             return;
 
         if (TeaModules::Sed::Module::match(res_))
+            return;
+
+        if (TeaModules::Mock::Module::match(res_))
             return;
     }
 }
