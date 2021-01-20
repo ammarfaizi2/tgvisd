@@ -42,11 +42,11 @@ public:
         if (memcmp(ctext, "sh ", 3) == 0) {
             ctext += 3;
             len   -= 4;
+            edit_msg_ = false;
         } else
         if (memcmp(ctext, "shr ", 4) == 0) {
             ctext += 4;
             len   -= 5;
-            edit_msg_ = false;
         } else {
             /* Message doesn't match. */
             return false;

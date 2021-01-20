@@ -17,6 +17,10 @@ namespace TeaBot::Modules::Sed {
 
 class Module : public TeaBotModule
 {
+private:
+    std::string replied_text_;
+    bool check_replied_msg();
+
 public:
     inline static bool match(std::shared_ptr<Response> &res)
     {
@@ -24,14 +28,14 @@ public:
         const char        *ctext = text.c_str();
         size_t            len    = text.size();
 
-        if (len < 5)
+        if (len < 6)
             return false;
 
         ctext++;
         if (memcmp(ctext, "sed ", 4) != 0)
             return false;
 
-        ctext += 3;
+        ctext += 4;
         len   -= 5;
         Module mod(res);
         mod.run(ctext, len);
@@ -39,7 +43,7 @@ public:
         return true;
     }
 
-    void run(const char *cmd, size_t len);
+    void run(const char *pat, size_t len);
     inline Module(std::shared_ptr<Response> &res):
         TeaBotModule(res)
     {}

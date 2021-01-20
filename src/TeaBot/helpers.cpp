@@ -25,7 +25,7 @@ char *escapeshellarg(char *alloc, const char *str, size_t len, size_t *res_len)
     char   *cmd;
 
     if (alloc == NULL) {
-        cmd = (char *)malloc(sizeof(char) * l * 4); /* Worst case */
+        cmd = (char *)malloc((sizeof(char) * l * 4) + 1); /* Worst case */
     } else {
         cmd = alloc;
     }
