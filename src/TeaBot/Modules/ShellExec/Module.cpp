@@ -2,8 +2,9 @@
 /**
  * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
  * @license GPL-v3
- * @package TeaBot
+ * @package TeaBot::Modules::ShellExec
  */
+
 #include <iostream>
 #include <cstdio>
 #include <errno.h>
@@ -47,8 +48,10 @@ void Module::run(const char *cmd, size_t len)
                         std::move(prer));
     auto entities  = std::vector<decltype(text_ent)>();
     entities.push_back(std::move(text_ent));
-    auto text      = td_api::make_object<td_api::formattedText>(cmd_out,
-                        std::move(entities));
+    auto text      = td_api::make_object<td_api::formattedText>(
+                        std::move(cmd_out),
+                        std::move(entities)
+                    );
     imt->text_     = std::move(text);
 
     if (edit_msg_) {

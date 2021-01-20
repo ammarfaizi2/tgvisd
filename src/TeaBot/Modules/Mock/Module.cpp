@@ -76,50 +76,6 @@ void Module::run(const char *pat, size_t len)
     const char *crep      = replied_text_.c_str();
     size_t      crep_len  = replied_text_.size();
 
-    alloc += (crep_len * 4) + 1; /* (escaped) Replied message allocation. */
-    alloc += (len * 4) + 4;      /* (escaped) Pattern allocation. */
-    alloc += sizeof(PRINT_CMD) + sizeof(SED_CMD) + sizeof(" 2>&1");
-
-    char *heap = new char[alloc];
-    char *cmd  = heap;
-
-    memcpy(cmd, PRINT_CMD, sizeof(PRINT_CMD) - 1);
-    cmd += sizeof(PRINT_CMD) - 1;
-    escapeshellarg(cmd, crep, crep_len, &esc_len);
-    cmd += esc_len;
-    memcpy(cmd, SED_CMD, sizeof(SED_CMD) - 1);
-    cmd += sizeof(SED_CMD) - 1;
-    escapeshellarg(cmd, pat, len, &esc_len);
-    cmd += esc_len;
-    memcpy(cmd, " 2>&1", sizeof(" 2>&1"));
-
-    std::string reply = "Sed output:\n\n";
-    reply.reserve(16 + (crep_len * 2) + 4096);
-    reply += shell_exec(heap);
-    delete[] heap;
-
-    auto &update_  = res_->update_;
-    auto &msg      = update_.message_;
-    auto imt       = td_api::make_object<td_api::inputMessageText>();
-
-    /* Text formatting. */
-    auto pre       = td_api::make_object<td_api::textEntityTypeBold>();
-    auto prer      = td::move_tl_object_as<td_api::TextEntityType>(pre);
-    auto text_ent  = td_api::make_object<td_api::textEntity>(0, 11,
-                        std::move(prer));
-    auto entities  = std::vector<decltype(text_ent)>();
-    entities.push_back(std::move(text_ent));
-    auto text      = td_api::make_object<td_api::formattedText>(
-                        std::move(reply),
-                        std::move(entities)
-                    );
-    imt->text_     = std::move(text);
-
-    auto rmsg         = td_api::make_object<td_api::sendMessage>();
-    rmsg->chat_id_    = res_->chat_id_;
-    rmsg->reply_to_message_id_ = msg->reply_to_message_id_;
-    rmsg->input_message_content_ = std::move(imt);
-    res_->handler_->send_query(std::move(rmsg), {});
 }
 
 } /* namespace TeaBot::Modules::Sed */
