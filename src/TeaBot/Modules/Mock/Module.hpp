@@ -2,18 +2,18 @@
 /**
  * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
  * @license GPL-v3
- * @package TeaBot::Modules::Sed
+ * @package TeaBot::Modules::Mock
  */
 
-#ifndef TEABOT__MODULES__SED__MODULE_HPP
-#define TEABOT__MODULES__SED__MODULE_HPP
+#ifndef TEABOT__MODULES__MOCK__MODULE_HPP
+#define TEABOT__MODULES__MOCK__MODULE_HPP
 
 #include <cstring>
 #include <TeaBot/TeaBotModule.hpp>
 
 using TeaBot::TeaBotModule;
 
-namespace TeaBot::Modules::Sed {
+namespace TeaBot::Modules::Mock {
 
 class Module : public TeaBotModule
 {
@@ -28,7 +28,7 @@ public:
         const char        *ctext = text.c_str();
         size_t            len    = text.size();
 
-        if (len < 6)
+        if (len < 5)
             return false;
 
         ctext++;
@@ -43,12 +43,12 @@ public:
         return true;
     }
 
-    void run(const char *pat, size_t len);
+    void run();
     inline Module(std::shared_ptr<Response> &res):
         TeaBotModule(res)
     {}
 };
 
-} /* namespace TeaBot::Modules::Sed */
+} /* namespace TeaBot::Modules::Mock */
 
 #endif
