@@ -29,7 +29,6 @@ void Module::run(const char *cmd, size_t len)
     memcpy(comp_ptr, SHELL_WRAP_STR, sizeof(SHELL_WRAP_STR) - 1);
     comp_ptr += sizeof(SHELL_WRAP_STR) - 1;
     comp_ptr  = escapeshellarg(comp_ptr, cmd, len, &escaped_len);
-    comp_ptr  = trim_len_cpy(comp_ptr, escaped_len, &escaped_len);
     comp_ptr += escaped_len;
     memcpy(comp_ptr, " 2>&1", 6);
 
