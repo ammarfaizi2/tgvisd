@@ -259,9 +259,9 @@ void TdHandler::on_authorization_state_update()
                 );
             },
             [this](td_api::authorizationStateWaitEncryptionKey &) {
-                std::cout << "Enter encryption key or DESTROY: " << std::flush;
-                std::string key;
-                std::getline(std::cin, key);
+                // std::cout << "Enter encryption key or DESTROY: " << std::flush;
+                std::string key = "";
+                // std::getline(std::cin, key);
 
                 if (key == "DESTROY")
                     send_query(td_api::make_object<td_api::destroy>(),

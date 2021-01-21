@@ -201,7 +201,6 @@ std::string shell_exec(const char *cmd)
 
 ret:
     {
-        fflush(stdout);
         std::string ret;
         ret.assign(outret, outlen);
         return ret;
