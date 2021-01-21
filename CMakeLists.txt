@@ -6,6 +6,7 @@ project(TeaBot VERSION 8.3 LANGUAGES CXX)
 find_package(Td 1.7.0 REQUIRED)
 
 include_directories(src)
+include_directories(src/ext)
 
 set(TDTEABOT_SOURCE
   src/TdTeaBot/TdHandler.cpp
