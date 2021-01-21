@@ -19,6 +19,11 @@ set(TEABOT_MOD_DEBUG
   src/TeaBot/Modules/Debug/Module.cpp
 )
 
+set(TEABOT_MOD_KERNELUPDATE
+  src/TeaBot/Modules/KernelUpdate/Module.hpp
+  src/TeaBot/Modules/KernelUpdate/Module.cpp
+)
+
 set(TEABOT_MOD_MOCK
   src/TeaBot/Modules/Mock/Module.hpp
   src/TeaBot/Modules/Mock/Module.cpp
@@ -49,17 +54,26 @@ set(TEABOT_SOURCE
   src/TeaBot/TeaBot.hpp
   src/TeaBot/TeaBotModule.hpp
 
+  src/TeaBot/TeaCurl.cpp
+  src/TeaBot/TeaCurl.hpp
+
   ${TEABOT_MOD_DEBUG}
+  ${TEABOT_MOD_KERNELUPDATE}
   ${TEABOT_MOD_MOCK}
   ${TEABOT_MOD_SED}
   ${TEABOT_MOD_SHELLEXEC}
 )
 
 set(TEABOT_TEST
+  src/tests/curl.hpp
+  src/TeaBot/TeaCurl.cpp
+  src/TeaBot/TeaCurl.hpp
+
+  src/tests/helpers.hpp
   src/TeaBot/helpers.cpp
   src/TeaBot/helpers.hpp
 
-  src/tests/helpers.cpp
+  src/tests/main.cpp
 )
 
 add_library(tdteabot SHARED ${TDTEABOT_SOURCE})
@@ -88,7 +102,7 @@ target_compile_options(teabot PRIVATE
 
 add_executable(teabot_test ${TEABOT_TEST})
 set_property(TARGET teabot_test PROPERTY CXX_STANDARD 20)
-target_link_libraries(teabot_test)
+target_link_libraries(teabot_test curl)
 target_include_directories(teabot_test PRIVATE td/include)
 target_compile_options(teabot_test PRIVATE
   -pedantic

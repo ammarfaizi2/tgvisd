@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <TeaBot/Responses/Message.hpp>
 
+#include <TeaBot/Modules/KernelUpdate/Module.hpp>
 #include <TeaBot/Modules/ShellExec/Module.hpp>
 #include <TeaBot/Modules/Sed/Module.hpp>
 
@@ -67,6 +68,9 @@ void Message::handle_text_message()
     size_t            len    = text.size();
 
     if (is_cmd_format(ctext, len)) {
+        if (TeaModules::KernelUpdate::Module::match(res_))
+            return;
+
         if (TeaModules::ShellExec::Module::match(res_))
             return;
 

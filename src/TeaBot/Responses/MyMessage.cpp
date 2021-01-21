@@ -10,6 +10,7 @@
 #include <TeaBot/Responses/MyMessage.hpp>
 
 #include <TeaBot/Modules/Debug/Module.hpp>
+#include <TeaBot/Modules/KernelUpdate/Module.hpp>
 #include <TeaBot/Modules/Mock/Module.hpp>
 #include <TeaBot/Modules/Sed/Module.hpp>
 #include <TeaBot/Modules/ShellExec/Module.hpp>
@@ -70,6 +71,9 @@ void MyMessage::handle_text_message()
 
     if (is_cmd_format(ctext, len)) {
         if (TeaModules::Debug::Module::match(res_))
+            return;
+
+        if (TeaModules::KernelUpdate::Module::match(res_))
             return;
 
         if (TeaModules::Mock::Module::match(res_))

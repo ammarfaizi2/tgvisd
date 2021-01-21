@@ -1,21 +1,5 @@
 
-#undef NDEBUG
-
-#include <cstdio>
-#include <cassert>
-#include <cstring>
 #include <TeaBot/helpers.hpp>
-
-inline static void test_trim_implicit_len();
-inline static void test_trim_explicit_len();
-
-int main()
-{
-    test_trim_implicit_len();
-    test_trim_explicit_len();
-    return 0;
-}
-
 
 /**
  * @return void
