@@ -5,9 +5,6 @@
  * @package TeaBot::Modules::KernelUpdate
  */
 
-#include <iostream>
-#include <cstdio>
-#include <errno.h>
 #include <TeaBot/TeaCurl.hpp>
 #include <TeaBot/helpers.hpp>
 #include <TeaBot/Modules/KernelUpdate/Module.hpp>
