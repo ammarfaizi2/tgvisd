@@ -12,4 +12,7 @@ cmake -DCMAKE_BUILD_TYPE=Release -DTd_DIR=$(pwd)/../td/lib/cmake/Td .. cmake/Td 
 make -j$(nproc)
 ```
 
+## Usage
+More information, see: src/TeaBot/main.cpp
+
 This project is licensed under GPL-v3 license.
