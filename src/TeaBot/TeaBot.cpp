@@ -102,10 +102,11 @@ void TeaBot::updateNewMessage(td_api::updateNewMessage &update)
 		return;
 	}
 
-	std::unique_ptr<Response> resObj {
-		std::make_unique<Response>(std::move(update), handler_)
+	std::shared_ptr<Response> resObj {
+		std::make_shared<Response>(std::move(update), handler_)
 	};
 
+	resObj->setSelfPtr(resObj);
 	std::thread resThread(&Response::run, std::move(resObj));
 	resThread.detach();
 }

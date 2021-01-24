@@ -41,6 +41,10 @@ public:
 		return text_;
 	}
 
+	inline void setSelfPtr(std::shared_ptr<Response> self)
+	{
+		self_ = self;
+	}
 };
 
 } /* namespace TeaBot */

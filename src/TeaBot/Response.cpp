@@ -19,8 +19,7 @@ namespace TeaBot {
 Response::Response(td_api::updateNewMessage update,
 		   std::shared_ptr<TdHandler> handler):
 	update_(std::move(update)),
-	handler_(handler),
-	self_(this)
+	handler_(handler)
 {
 
 	auto &update_ = this->update_;
