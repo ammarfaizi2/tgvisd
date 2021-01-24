@@ -94,7 +94,7 @@ out:
  * @return int
  */
 static int load_account_list(const char *filename, account **acc_list_p,
-							 size_t *n_acc_p)
+			     size_t *n_acc_p)
 {
 	int retval;
 	FILE *acc_h;
