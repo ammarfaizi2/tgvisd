@@ -47,7 +47,7 @@ inline static char toupper(char x)
 inline static void mock_string(char *str, size_t len)
 {
 	bool c = true;
-		while (len--) {
+	while (len--) {
 		*str = c ? tolower(*str) : toupper(*str);
 		str++;
 		c = !c;
