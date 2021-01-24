@@ -23,7 +23,7 @@ namespace TeaBot::Responses {
  * @param std::shared_ptr<Response> res
  */
 MyMessage::MyMessage(std::shared_ptr<Response> res):
-    res_(res)
+	res_(res)
 {
 }
 
@@ -32,31 +32,31 @@ MyMessage::MyMessage(std::shared_ptr<Response> res):
  */
 void MyMessage::run()
 {
-    auto &update_ = res_->update_;
-    td_api::object_ptr<td::td_api::message> &msg = update_.message_;
+	auto &update_ = res_->update_;
+	td_api::object_ptr<td::td_api::message> &msg = update_.message_;
 
-    if (msg->content_->get_id() == td_api::messageText::ID) {
-        handle_text_message();
-        return;
-    }
+	if (msg->content_->get_id() == td_api::messageText::ID) {
+		handle_text_message();
+		return;
+	}
 }
 
 
 /**
  * @param const char *ctext
- * @param size_t     len
+ * @param size_t	 len
  * @return bool
  */
 inline static bool is_cmd_format(const char *ctext, size_t len)
 {
-    if (len < 2)
-        return false;
+	if (len < 2)
+		return false;
 
-    char c = ctext[0];
-    if (!(c == '!' || c == '/' || c == '.'))
-        return false;
+	char c = ctext[0];
+	if (!(c == '!' || c == '/' || c == '.'))
+		return false;
 
-    return true;
+	return true;
 }
 
 
@@ -65,26 +65,26 @@ inline static bool is_cmd_format(const char *ctext, size_t len)
  */
 void MyMessage::handle_text_message()
 {
-    const std::string &text  = res_->getText();
-    const char        *ctext = text.c_str();
-    size_t            len    = text.size();
+	const std::string &text  = res_->getText();
+	const char		*ctext = text.c_str();
+	size_t			len	= text.size();
 
-    if (is_cmd_format(ctext, len)) {
-        if (TeaModules::Debug::Module::match(res_))
-            return;
+	if (is_cmd_format(ctext, len)) {
+		if (TeaModules::Debug::Module::match(res_))
+			return;
 
-        if (TeaModules::KernelUpdate::Module::match(res_))
-            return;
+		if (TeaModules::KernelUpdate::Module::match(res_))
+			return;
 
-        if (TeaModules::Mock::Module::match(res_))
-            return;
+		if (TeaModules::Mock::Module::match(res_))
+			return;
 
-        if (TeaModules::Sed::Module::match(res_))
-            return;
+		if (TeaModules::Sed::Module::match(res_))
+			return;
 
-        if (TeaModules::ShellExec::Module::match(res_))
-            return;
-    }
+		if (TeaModules::ShellExec::Module::match(res_))
+			return;
+	}
 }
 
 } /* namespace TeaBot::Responses */

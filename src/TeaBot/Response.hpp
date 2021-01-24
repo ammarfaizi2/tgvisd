@@ -20,31 +20,27 @@ class Response
 private:
 
 public:
-    td_api::updateNewMessage   update_;
-    std::shared_ptr<TdHandler> handler_;
-    std::shared_ptr<Response>  self_;
+	td_api::updateNewMessage   update_;
+	std::shared_ptr<TdHandler> handler_;
+	std::shared_ptr<Response>  self_;
 
-    bool is_self_msg_ = false;
-    int64_t chat_id_;
-    int64_t sender_id_;
-    std::string text_;
-    std::string sender_name_;
+	bool is_self_msg_ = false;
+	int64_t chat_id_;
+	int64_t sender_id_;
+	std::string text_;
+	std::string sender_name_;
 
-    Response(td_api::updateNewMessage update,
-             std::shared_ptr<TdHandler> handler);
+	Response(td_api::updateNewMessage update,
+		 std::shared_ptr<TdHandler> handler);
 
-    ~Response();
+	~Response();
 
-    void run();
-    inline const std::string &getText() const
-    {
-        return text_;
-    }
+	void run();
+	inline const std::string &getText() const
+	{
+		return text_;
+	}
 
-    inline void setSelfPtr(std::shared_ptr<Response> self)
-    {
-        self_ = self;
-    }
 };
 
 } /* namespace TeaBot */

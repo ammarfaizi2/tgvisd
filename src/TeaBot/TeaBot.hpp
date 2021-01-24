@@ -17,14 +17,14 @@ namespace TeaBot {
 class TeaBot
 {
 private:
-    std::shared_ptr<TdHandler> handler_;
+	std::shared_ptr<TdHandler> handler_;
 
-    void updateNewMessage(td_api::updateNewMessage &update);
+	void updateNewMessage(td_api::updateNewMessage &update);
 
 public:
-    TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
-    ~TeaBot();
-    void run();
+	TeaBot(uint32_t api_id, const char *api_hash, const char *data_path);
+	~TeaBot();
+	void run();
 };
 
 } /* namespace TeaBot */

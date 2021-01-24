@@ -28,10 +28,10 @@ private:
 public:
     inline static bool match(std::shared_ptr<Response> &res)
     {
-        bool              edit_msg_ = true;
-        const std::string &text     = res->getText();
-        const char        *ctext    = text.c_str();
-        size_t            len       = text.size();
+        bool edit_msg_ = true;
+        const std::string &text = res->getText();
+        const char *ctext = text.c_str();
+        size_t len = text.size();
 
         /* Skip message with length less than 5. */
         if (len < 5)

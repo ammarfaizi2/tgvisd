@@ -15,16 +15,16 @@ namespace TeaBot {
 class TeaBotModule
 {
 protected:
-    std::shared_ptr<Response> &res_;
+	std::shared_ptr<Response> &res_;
 
 public:
-    inline TeaBotModule(std::shared_ptr<Response> &res):
-        res_(res) {};
+	inline TeaBotModule(std::shared_ptr<Response> &res):
+		res_(res) {};
 
-    inline static bool exec(std::shared_ptr<Response> &res)
-    {
-        return false;
-    }
+	inline static bool exec(std::shared_ptr<Response> &res)
+	{
+		return false;
+	}
 };
 
 } /* namespace TeaBot */

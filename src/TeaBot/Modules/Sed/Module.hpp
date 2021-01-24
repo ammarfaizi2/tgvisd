@@ -24,9 +24,9 @@ private:
 public:
     inline static bool match(std::shared_ptr<Response> &res)
     {
-        const std::string &text  = res->getText();
-        const char        *ctext = text.c_str();
-        size_t            len    = text.size();
+        const std::string &text = res->getText();
+        const char *ctext = text.c_str();
+        size_t len = text.size();
 
         if (len < 6)
             return false;

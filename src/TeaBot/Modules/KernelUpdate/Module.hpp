@@ -18,29 +18,29 @@ namespace TeaBot::Modules::KernelUpdate {
 class Module : public TeaBotModule
 {
 public:
-    inline static bool match(std::shared_ptr<Response> &res)
-    {
-        const std::string &text  = res->getText();
-        const char        *ctext = text.c_str();
-        size_t            len    = text.size();
+	inline static bool match(std::shared_ptr<Response> &res)
+	{
+		const std::string &text = res->getText();
+		const char *ctext = text.c_str();
+		size_t len = text.size();
 
-        if (len < 7)
-            return false;
+		if (len < 7)
+			return false;
 
-        ctext++;
-        if (memcmp(ctext, "kernel", 6) != 0)
-            return false;
+		ctext++;
+		if (memcmp(ctext, "kernel", 6) != 0)
+			return false;
 
-        Module mod(res);
-        mod.run();
+		Module mod(res);
+		mod.run();
 
-        return true;
-    }
+		return true;
+	}
 
-    void run();
-    inline Module(std::shared_ptr<Response> &res):
-        TeaBotModule(res)
-    {}
+	void run();
+	inline Module(std::shared_ptr<Response> &res):
+		TeaBotModule(res)
+	{}
 };
 
 } /* namespace TeaBot::Modules::KernelUpdate */

@@ -5,8 +5,6 @@
  * @package TeaBot
  */
 
-#include "TeaBot/TeaBot.hpp"
-
 #include <thread>
 #include <cstdio>
 #include <cstdlib>
@@ -14,17 +12,193 @@
 #include <cstring>
 #include <errno.h>
 
+#include <TeaBot/TeaBot.hpp>
+#include <TeaBot/helpers.hpp>
 
-typedef struct _account_list
+
+typedef struct account_ {
+	uint32_t api_id;
+	char api_hash[64];
+	char data_path[1024];
+} account;
+
+
+/**
+ * @param const char *data_path
+ * @param account *acc_p
+ * @return int
+ */
+__attribute__((always_inline))
+inline static int load_account(const char *data_path, account *acc_p)
 {
-    uint32_t    api_id;
-    const char  *api_hash;
-    const char  *data_path;
-} account_list;
+	int retval;
+	char buf[2048];
+	char con_bf[64]; /* file content buffer */
+	FILE *handle;
+
+	retval = 0;
+
+	(strncpy(acc_p->data_path, data_path, sizeof(acc_p->data_path) - 1));
+
+	/* Load API Hash */
+	snprintf(buf, sizeof(buf), "%s/api_hash.txt", data_path);
+	handle = fopen(buf, "r");
+	if (handle == NULL) {
+		printf("Error: fopen(\"%s\"): %s\n", buf, strerror(errno));
+		retval = -1;
+		goto out;
+	}
+
+	if (fgets(con_bf, sizeof(con_bf), handle)) {
+		strncpy(acc_p->api_hash, trim(con_bf), sizeof(acc_p->api_hash) - 1);
+	} else {
+		printf("Cannot read API hash from \"%s\"\n", buf);
+		retval = -EINVAL;
+		goto out;
+	}
+	fclose(handle);
+	/* End of Load API ID */
 
 
-static void *thread_worker(void *p_);
-static account_list *load_account_list(const char *file, uint32_t *n_list_p);
+	/* Load API ID */
+	snprintf(buf, sizeof(buf), "%s/api_id.txt", data_path);
+	handle = fopen(buf, "r");
+	if (handle == NULL) {
+		printf("Error: fopen(\"%s\"): %s\n", buf, strerror(errno));
+		retval = -1;
+		goto out;
+	}
+
+	if (fgets(con_bf, sizeof(con_bf), handle)) {
+		acc_p->api_id = strtoul(con_bf, NULL, 10);
+	} else {
+		printf("Cannot read API ID from \"%s\"\n", buf);
+		retval = -EINVAL;
+		goto out;
+	}
+	/* End of Load API ID */
+
+out:
+	if (handle != NULL)
+		fclose(handle);
+
+	return retval;
+}
+
+
+/**
+ * @param cons char *filename
+ * @param account   **acc
+ * @param size_t	*n_acc_p
+ * @return int
+ */
+static int load_account_list(const char *filename, account **acc_list_p,
+							 size_t *n_acc_p)
+{
+	int retval;
+	FILE *acc_h;
+	char buf[1023];
+	account *acc_list = NULL;
+	size_t n_acc = 0;
+	size_t acc_alloc = 5;
+
+	retval = 0;
+
+	if (acc_list_p == NULL) {
+		printf("acc_list_p cannot be NULL\n");
+		retval = -EINVAL;
+		goto out;
+	}
+
+	acc_h = fopen(filename, "r");
+	if (acc_h == NULL) {
+		printf("Error: fopen(\"%s\"): %s\n", filename, strerror(errno));
+		retval = -1;
+		goto out;
+	}
+
+	acc_list = (account *)malloc(sizeof(account) * acc_alloc);
+	if (acc_list == NULL) {
+		printf("Error: malloc(): %s\n", strerror(errno));
+		retval = -1;
+		goto out;
+	}
+
+	while (fgets(buf, sizeof(buf), acc_h) != NULL) {
+		size_t len;
+		int load_retval;
+
+		len = strlen(buf);
+
+		if (buf[len - 1] == '\n')
+			buf[--len] = '\0';
+
+		if ((n_acc + 1) >= acc_alloc) {
+			account *tmp;
+
+			acc_alloc *= 2;
+			tmp = (account *)realloc(acc_list,
+						 sizeof(account) * acc_alloc);
+			if (tmp == NULL) {
+				printf("Error: realloc(): %s\n",
+					strerror(errno));
+				retval = -1;
+				goto out;
+			}
+			acc_list = tmp;
+		}
+
+		load_retval = load_account(buf, &acc_list[n_acc]);
+		if (load_retval < 0) {
+			retval = load_retval;
+			goto out;
+		}
+		n_acc++;
+	}
+
+
+out:
+	if (acc_h != NULL)
+		fclose(acc_h);
+
+
+	if (retval == 0) {
+
+		/* Success. */
+		if (n_acc_p != NULL)
+			*n_acc_p = n_acc;
+
+		*acc_list_p = acc_list;
+
+	} else {
+
+		/* Error occured. */
+		if (acc_list != NULL)
+			free(acc_list);
+
+	}
+
+	return retval;
+}
+
+
+/**
+ * @param void *_acc
+ * @return void *
+ */
+static void *thread_worker(void *_acc)
+{
+	account *acc = (account *)_acc;
+
+	printf("api_id    = %d\n", acc->api_id);
+    	printf("api_hash  = %s\n", acc->api_hash);
+    	printf("data_path = %s\n", acc->data_path);
+
+    	TeaBot::TeaBot bot(acc->api_id, acc->api_hash, acc->data_path);
+    	bot.run();
+
+	return NULL;
+}
 
 
 /**
@@ -34,168 +208,44 @@ static account_list *load_account_list(const char *file, uint32_t *n_list_p);
  */
 int main(int argc, char *argv[])
 {
-    account_list *list;
-    uint32_t     n_list;
+	int retval;
+	std::thread *threads = NULL;
+	account *acc_list = NULL;
+	size_t  n_acc	  = 0;
 
-    if (argc != 2) {
-        printf("Usage: %s [account list file]\n", argv[0]);
-        return 0;
-    }
+	if (argc != 2) {
+		printf("Usage: %s [account list file]\n", argv[0]);
+		return 1;
+	}
 
-    if ((list = load_account_list(argv[1], &n_list)) == NULL) {
-        return 1;
-    }
+	if (load_account_list(argv[1], &acc_list, &n_acc) < 0)
+		return 1;
 
-    std::thread *threads = new std::thread[n_list];
+	retval = 0;
 
-    for (uint32_t i = 0; i < n_list; i++) {
-        threads[i] = std::thread(thread_worker, (void *)&(list[i]));
-    }
+	try {
+		threads = new std::thread[n_acc];
 
-    for (uint32_t i = 0; i < n_list; i++) {
-        threads[i].join();
-    }
+		for (size_t i = 0; i < n_acc; i++) {
+			threads[i] = std::thread(thread_worker,
+						 (void *)&acc_list[i]);
+		}
 
-    delete[] threads;
-    free(list);
+		for (size_t i = 0; i < n_acc; i++) {
+			threads[i].join();
+		}
 
-    return 0;
-}
-
-
-/**
- * @param void *p_
- * @return void *
- */
-static void *thread_worker(void *p_)
-{
-    account_list *list = (account_list *)p_;
-
-    printf("api_id    = %d\n", list->api_id);
-    printf("api_hash  = %s\n", list->api_hash);
-    printf("data_path = %s\n", list->data_path);
-
-    TeaBot::TeaBot bot(list->api_id, list->api_hash, list->data_path);
-    bot.run();
-
-    free((void *)list->api_hash);
-    free((void *)list->data_path);
-    list->api_hash  = NULL;
-    list->data_path = NULL;
-
-    return NULL;
-}
+	} catch (...) {
+		retval = 1;
+		printf("Error occured\n");
+	}
 
 
-/**
- * @param const char *file
- * @param uint32_t   *n_list_p
- * @return account_list *
- */
-static account_list *load_account_list(const char *file, uint32_t *n_list_p)
-{
-    char          *p;
-    char          acc_buf[4096];
-    uint32_t      n_list        = 0;
-    FILE          *acc_handle   = NULL;
-    account_list  *list         = NULL;
+	if (acc_list != NULL)
+		free(acc_list);
 
-    acc_handle = fopen(file, "r");
-    if (acc_handle == NULL) {
-        printf("Error fopen(\"%s\"): %s\n", file, strerror(errno));
-        goto clean_up;
-    }
+	if (threads != NULL)
+		delete[] threads;
 
-    while ((p = fgets(acc_buf, sizeof(acc_buf), acc_handle)) != NULL) {
-        account_list    *tmp;
-        uint32_t        api_id;
-        FILE            *handle;
-        char            *p2;
-        char            *api_hash;
-        char            name_buf[5120];
-        char            file_buf[1024];
-        size_t          len = strlen(acc_buf);
-
-        if (acc_buf[len - 1] == '\n')
-            acc_buf[len - 1] = '\0';
-
-        n_list++;
-        tmp = (account_list *)realloc(list, sizeof(account_list) * n_list);
-        if (tmp == NULL) {
-            free(list);
-            list = NULL;
-            printf("Error realloc(): %s\n", strerror(errno));
-            goto clean_up;
-        }
-        list = tmp;
-
-
-        /*
-         * Load API ID
-         */
-        sprintf(name_buf, "%s/api_id.txt", acc_buf);
-        handle = fopen(name_buf, "r");
-        if (handle == NULL) {
-            free(list);
-            list = NULL;
-            printf("Error fopen(\"%s\"): %s\n", name_buf, strerror(errno));
-            goto clean_up;
-        }
-
-        p2 = fgets(file_buf, sizeof(file_buf), handle);
-        if (p2 == NULL) {
-            free(list);
-            list = NULL;
-            printf("Unable to read api_id from \"%s\"\n", file_buf);
-            goto clean_up;
-        }
-        fclose(handle);
-        if ((api_id = strtoul(file_buf, NULL, 10)) == 0) {
-            printf("Invalid api_id from \"%s\"\n", file_buf);
-            goto clean_up;
-        }
-
-
-
-        /*
-         * Load API Hash
-         */
-        sprintf(name_buf, "%s/api_hash.txt", acc_buf);
-        handle = fopen(name_buf, "r");
-        if (handle == NULL) {
-            free(list);
-            list = NULL;
-            printf("Error fopen(\"%s\"): %s\n", name_buf, strerror(errno));
-            goto clean_up;
-        }
-
-        p2 = fgets(file_buf, sizeof(file_buf), handle);
-        if (p2 == NULL) {
-            printf("Unable to read api_hash from \"%s\"\n", file_buf);
-            goto clean_up;
-        }
-        fclose(handle);
-        len = strlen(file_buf);
-
-        if (file_buf[len - 1] == '\n')
-            file_buf[len - 1] = '\0';
-
-        api_hash = strdup(file_buf);
-
-
-        list[n_list - 1].api_id    = api_id;
-        list[n_list - 1].api_hash  = api_hash;
-        list[n_list - 1].data_path = strdup(acc_buf);
-    }
-
-
-clean_up:
-
-    if (acc_handle != NULL)
-        fclose(acc_handle);
-
-    if (list != NULL)
-        *n_list_p = n_list;
-
-    return list;
+	return retval;
 }

@@ -16,48 +16,48 @@ namespace TeaBot {
 class TeaCurl
 {
 private:
-    CURL *curl_ = NULL;
-    CURLcode res_;
-    const char *url_      = NULL;
-    char   *output_       = NULL;
-    size_t outlen_        = 0;
-    size_t output_alloc_  = 0;
-    bool   release_heap_  = false;
+	CURL *curl_ = NULL;
+	CURLcode res_;
+	const char *url_	  = NULL;
+	char   *output_	   = NULL;
+	size_t outlen_		= 0;
+	size_t output_alloc_  = 0;
+	bool   release_heap_  = false;
 
-    static size_t write_callback(char *ptr, size_t size, size_t nmemb,
-                                 void *userdata);
+	static size_t write_callback(char *ptr, size_t size, size_t nmemb,
+								 void *userdata);
 public:
-    inline TeaCurl()
-    {
-        init();
-    }
+	inline TeaCurl()
+	{
+		init();
+	}
 
-    ~TeaCurl();
+	~TeaCurl();
 
-    inline TeaCurl(const char *url): url_(url)
-    {
-        init();
-    }
+	inline TeaCurl(const char *url): url_(url)
+	{
+		init();
+	}
 
-    inline void setUrl(const char *url) noexcept
-    {
-        url_ = url;
-    }
+	inline void setUrl(const char *url) noexcept
+	{
+		url_ = url;
+	}
 
-    inline char *get_output()
-    {
-        release_heap_ = true;
-        return output_;
-    }
+	inline char *get_output()
+	{
+		release_heap_ = true;
+		return output_;
+	}
 
-    inline size_t get_outlen()
-    {
-        return outlen_;
-    }
+	inline size_t get_outlen()
+	{
+		return outlen_;
+	}
 
-    void init();
+	void init();
 
-    CURLcode execute();
+	CURLcode execute();
 };
 
 } /* namespace TeaBot */

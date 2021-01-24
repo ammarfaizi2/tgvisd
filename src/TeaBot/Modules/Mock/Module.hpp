@@ -18,33 +18,33 @@ namespace TeaBot::Modules::Mock {
 class Module : public TeaBotModule
 {
 private:
-    std::string replied_text_;
-    bool check_replied_msg();
+	std::string replied_text_;
+	bool check_replied_msg();
 
 public:
-    inline static bool match(std::shared_ptr<Response> &res)
-    {
-        const std::string &text  = res->getText();
-        const char        *ctext = text.c_str();
-        size_t            len    = text.size();
+	inline static bool match(std::shared_ptr<Response> &res)
+	{
+		const std::string &text = res->getText();
+		const char *ctext = text.c_str();
+		size_t len = text.size();
 
-        if (len < 5)
-            return false;
+		if (len < 5)
+			return false;
 
-        ctext++;
-        if (memcmp(ctext, "mock", 4) != 0)
-            return false;
+		ctext++;
+		if (memcmp(ctext, "mock", 4) != 0)
+			return false;
 
-        Module mod(res);
-        mod.run();
+		Module mod(res);
+		mod.run();
 
-        return true;
-    }
+		return true;
+	}
 
-    void run();
-    inline Module(std::shared_ptr<Response> &res):
-        TeaBotModule(res)
-    {}
+	void run();
+	inline Module(std::shared_ptr<Response> &res):
+		TeaBotModule(res)
+	{}
 };
 
 } /* namespace TeaBot::Modules::Mock */

@@ -17,12 +17,12 @@ namespace TeaBot::Responses {
 class MyMessage
 {
 private:
-    std::shared_ptr<Response> res_;
+	std::shared_ptr<Response> res_;
 
-    void handle_text_message();
+	void handle_text_message();
 public:
-    MyMessage(std::shared_ptr<Response> res);
-    void run();
+	MyMessage(std::shared_ptr<Response> res);
+	void run();
 };
 
 } /* namespace TeaBot::Responses */
