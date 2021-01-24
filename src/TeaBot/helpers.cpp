@@ -34,20 +34,20 @@ char *escapeshellarg(char *alloc, const char *str, size_t len, size_t *res_len)
 	for (x = 0; x < l; x++) {
 		switch (str[x]) {
 #ifdef WIN32
-			case '"':
-			case '%':
-			case '!':
-				cmd[y++] = ' ';
-				break;
+		case '"':
+		case '%':
+		case '!':
+			cmd[y++] = ' ';
+			break;
 #else
-			case '\'':
-				cmd[y++] = '\'';
-				cmd[y++] = '\\';
-				cmd[y++] = '\'';
+		case '\'':
+			cmd[y++] = '\'';
+			cmd[y++] = '\\';
+			cmd[y++] = '\'';
 #endif
-			/* fall-through */
-			default:
-				cmd[y++] = str[x];
+		/* fall-through */
+		default:
+			cmd[y++] = str[x];
 		}
 	}
 

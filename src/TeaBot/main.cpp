@@ -51,7 +51,7 @@ inline static int load_account(const char *data_path, account *acc_p)
 
 	if (fgets(con_bf, sizeof(con_bf), handle)) {
 		(strncpy(acc_p->api_hash, trim(con_bf),
-			sizeof(acc_p->api_hash) - 1));
+			 sizeof(acc_p->api_hash) - 1));
 	} else {
 		printf("Cannot read API hash from \"%s\"\n", buf);
 		retval = -EINVAL;
