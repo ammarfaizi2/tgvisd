@@ -58,9 +58,9 @@ private:
 
 	std::mutex on_auth_update_mutex;
 
-	void restart();
+	void restart(void);
 	void handle_event_loop(int timeout);
-	void on_authorization_state_update();
+	void on_authorization_state_update(void);
 	void check_authentication_error(Object object);
 	void process_response(td::ClientManager::Response response);
 	void process_update(td_api::object_ptr<td_api::Object> update);
