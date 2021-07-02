@@ -21,6 +21,7 @@ public:
 	void run(void);
 private:
 	std::shared_ptr<tgvisd::Td::Td> td_;
+	void updateNewMessage(td_api::updateNewMessage &update);
 };
 
 } /* namespace tgvisd::Main */

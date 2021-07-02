@@ -81,6 +81,12 @@ private:
 	void process_update(td_api::object_ptr<td_api::Object> update);
 	std::function<void(Object object)>
 		create_authentication_query_handler(void);
+
+
+	inline uint64_t next_query_id()
+	{
+		return atomic_fetch_add(&current_query_id_, 1);
+	}
 };
 
 } /* namespace tgvisd::Td */
