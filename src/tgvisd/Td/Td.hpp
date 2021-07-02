@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
+ * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
+ * @license GPL-2.0
+ * @package tgvisd::Td
+ *
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
@@ -19,6 +23,9 @@
 #include <functional>
 #include <unordered_map>
 
+namespace td_api = td::td_api;
+using Object = td_api::object_ptr<td_api::Object>;
+
 #include "Callback.hpp"
 
 namespace tgvisd::Td {
@@ -29,11 +36,10 @@ using std::function;
 using std::unique_ptr;
 using std::unordered_map;
 
-namespace td_api = td::td_api;
-using Object = td_api::object_ptr<td_api::Object>;
-
 class Td {
 public:
+	Callback	callback;
+
 	Td(uint32_t api_id, const char *api_hash, const char *data_path);
 	void loop(int timeout);
 	void close(void);
@@ -46,7 +52,6 @@ public:
 	}
 
 private:
-	Callback		callback;
 	uint32_t		api_id_;
 	const char		*api_hash_;
 	const char		*data_path_;
