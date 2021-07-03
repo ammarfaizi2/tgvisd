@@ -18,10 +18,12 @@ namespace tgvisd::Main {
 class Worker;
 
 class Main {
+
 public:
 	Main(uint32_t api_id, const char *api_hash, const char *data_path);
 	~Main(void);
 	void run(void);
+
 private:
 	constexpr static size_t max_thread_num = 128;
 
@@ -37,6 +39,7 @@ private:
 
 	inline int64_t freeThread(uint32_t idx) {
 		int64_t ret;
+
 		thread_stk_mutex_.lock();
 		if (thread_stk_.size() < max_thread_num) {
 			thread_stk_.push(idx);
@@ -49,21 +52,23 @@ private:
 			ret = -1;
 		}
 		thread_stk_mutex_.unlock();
+
 		return ret;
 	}
 
+
 	inline int64_t getFreeThreadIdx(void) {
 		int64_t ret;
-		thread_stk_mutex_.lock();
 
+		thread_stk_mutex_.lock();
 		if (__builtin_expect(!thread_stk_.empty(), 1)) {
 			ret = (int64_t)thread_stk_.top();
 			thread_stk_.pop();
 		} else {
 			ret = -1;
 		}
-
 		thread_stk_mutex_.unlock();
+
 		return ret;
 	}
 

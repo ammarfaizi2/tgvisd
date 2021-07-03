@@ -28,25 +28,19 @@ namespace tgvisd::Main {
 static std::mutex sig_mutex;
 static bool is_signaled = false;
 static bool is_sighandler_set = false;
+
+
 static void main_sighandler(int sig)
 {
 	if (!is_signaled) {
 		printf("\nGot an interrupt signal %d\n", sig);
-		printf("Syncing...\n");
 		is_signaled = true;
-		sync();
 	}
 }
 
-#endif /* #if defined(__linux__) */
 
-
-Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
-	td_(api_id, api_hash, data_path)
+static void set_interrupt_handler(void)
 {
-	unsigned int hc;
-
-#if defined(__linux__)
 	/*
 	 * Use signal interrupt handler to kill the
 	 * process gracefully on Linux.
@@ -67,6 +61,18 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 		is_sighandler_set = true;
 	}
 	sig_mutex.unlock();
+}
+
+#endif /* #if defined(__linux__) */
+
+
+Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
+	td_(api_id, api_hash, data_path)
+{
+	unsigned int hc;
+
+#if defined(__linux__)
+	set_interrupt_handler();
 #endif
 
 	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
@@ -83,6 +89,8 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	 * spawn more workers.
 	 */
 	hc = std::thread::hardware_concurrency();
+	if (!hc)
+		hc = 2;
 	threads_ = new Worker[max_thread_num];
 	for (size_t i = 0; i < max_thread_num; i++) {
 		threads_[i] = Worker(this, i);
@@ -100,6 +108,11 @@ Main::~Main(void)
 	td_.close();
 	if (threads_)
 		delete[] threads_;
+
+#if defined(__linux__)
+	printf("Syncing...\n");
+	sync();
+#endif
 }
 
 
