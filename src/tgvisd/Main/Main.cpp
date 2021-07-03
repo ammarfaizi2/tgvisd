@@ -8,20 +8,17 @@
  */
 
 #include <thread>
+#include <cassert>
 #include <iostream>
-#include <assert.h>
-
-#if defined(__linux__)
-#include <signal.h>
-#include <unistd.h>
-#endif
 
 #include "Main.hpp"
 #include "Worker.hpp"
 
-namespace tgvisd::Main {
 
 #if defined(__linux__)
+#  include <signal.h>
+#  include <unistd.h>
+
 /* 
  * Interrupt handler for Linux only.
  */
@@ -66,6 +63,12 @@ static void set_interrupt_handler(void)
 #endif /* #if defined(__linux__) */
 
 
+namespace tgvisd::Main {
+
+
+static void updateNewMessage(Main *main, td_api::updateNewMessage &update);
+
+
 Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	td_(api_id, api_hash, data_path)
 {
@@ -76,7 +79,7 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 #endif
 
 	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
-		this->updateNewMessage(update);
+		updateNewMessage(this, update);
 	};
 
 
@@ -91,35 +94,75 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	hc = std::thread::hardware_concurrency();
 	if (!hc)
 		hc = 2;
-	threads_ = new Worker[max_thread_num];
+
+	threads = new Worker[max_thread_num];
 	for (size_t i = 0; i < max_thread_num; i++) {
-		threads_[i] = Worker(this, i);
+		threads[i].__construct(this, i, i < hc);
 		if (i < hc)
-			threads_[i].spawn();
+			threads[i].spawn();
 	}
 
-	for (size_t i = max_thread_num; i--;)
-		assert(freeThread(i) == (int64_t)i);
+	for (size_t i = max_thread_num; i--;) {
+		threads[i].setAcceptingQueue(true);
+		addFreeWorker(&threads[i]);
+	}
 }
 
 
 Main::~Main(void)
 {
+	if (threads)
+		delete[] threads;
+
 	td_.close();
-	if (threads_)
-		delete[] threads_;
 
 #if defined(__linux__)
+	/*
+	 * Sync memory to disk to ensure
+	 * data consistency.
+	 */
 	printf("Syncing...\n");
 	sync();
 #endif
 }
 
 
+void Main::addFreeWorker(Worker *thread)
+	__acquires(&workerStackMutex_)
+	__releases(&workerStackMutex_)
+{
+	workerStackMutex_.lock();
+	assert(thread->isAcceptingQueue());
+	workerStack_.push(thread->getIndex());
+	assert(workerStack_.size() <= max_thread_num);
+	workerStackMutex_.unlock();
+}
+
+
+Worker *Main::getFreeWorker(void)
+	__acquires(&workerStackMutex_)
+	__releases(&workerStackMutex_)
+{
+	uint32_t idx;
+	Worker *ret = nullptr;
+	workerStackMutex_.lock();
+	if (__builtin_expect(!workerStack_.empty(), 1)) {
+		idx = workerStack_.top();
+		ret = &threads[idx];
+
+		if (ret->getUpdateQueue()->size() >= Worker::maxQueue) {
+			workerStack_.pop();
+			ret->setAcceptingQueue(false);
+		}
+	}
+	workerStackMutex_.unlock();
+	return ret;
+}
+
+
 void Main::run(void)
 {
 	constexpr int timeout = 1;
-
 	while (true) {
 
 #if defined(__linux__)
@@ -128,39 +171,34 @@ void Main::run(void)
 		 *
 		 * This can ensure the destructor is called
 		 * when we get interrupted. For example, if
-		 * the user presses CTRL + C (got SIGINT)
+		 * the user presses CTRL + C (got SIGINT).
 		 */
 		if (__builtin_expect(is_signaled, 0))
 			break;
-#endif	
-
+#endif
 		td_.loop(timeout);
 	}
 }
 
 
-void Main::updateNewMessage(td_api::updateNewMessage &update)
+static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 {
-	td_api::object_ptr<td::td_api::message> &msg = update.message_;
+	Worker *thread;
 
-	if (msg->content_->get_id() != td_api::messageText::ID) {
-		/* Skip non text message. */
+	thread = main->getFreeWorker();
+	if (__builtin_expect(!thread, 0)) {
+		/*
+		 * All threads are busy!
+		 *
+		 * TODO: Handle this event!
+		 */
 		return;
 	}
 
-	auto &message = update.message_;
-	auto &content = *message->content_;
+	thread->sendUpdateQueue(update);
 
-
-	std::cout << to_string(update) << std::endl;
-
-	// switch (message->content_->get_id()) {
-	// case td_api::messageText::ID: {
-	// 	auto &text = static_cast<td_api::messageText &>(content).text_;
-	// 	std::cout << text->text_ << std::endl;
-	// 	break;
-	// }
-	// }
+	if (!thread->isOnline())
+		thread->spawn();
 }
 
 

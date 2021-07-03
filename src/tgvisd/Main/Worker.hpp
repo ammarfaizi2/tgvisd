@@ -10,7 +10,15 @@
 #ifndef TGVISD__MAIN__WORKER_HPP
 #define TGVISD__MAIN__WORKER_HPP
 
+#include <mutex>
+#include <queue>
 #include <thread>
+#include <cassert>
+#include <condition_variable>
+
+#define __must_hold(MUTEX)
+#define __releases(MUTEX)
+#define __acquires(MUTEX)
 
 namespace tgvisd::Main {
 
@@ -19,33 +27,100 @@ class Main;
 class Worker
 {
 public:
+	constexpr static uint32_t maxQueue = 15;
+
 	Worker(void);
 	~Worker(void);
-	Worker(Main *main, uint32_t idx);
+	void __construct(Main *main, uint32_t idx, bool isPrimaryThread);
 	void spawn(void);
+	void close(void);
 
-	inline bool isBusy(void) {
-		return isBusy_;
+	inline void sendUpdateQueue(td_api::updateNewMessage &update)
+	{
+		assert(updateCond_);
+		assert(updateQueueMutex_);
+
+		updateQueueMutex_->lock();
+		updateQueue_.push(std::move(update));
+		updateQueueMutex_->unlock();
+		updateCond_->notify_one();
 	}
 
-	inline bool isOnline(void) {
-		return isOnline_;
-	}
-
-	inline uint32_t getIndex(void) {
+	inline uint32_t getIndex(void)
+	{
 		return idx_;
 	}
 
+	inline bool isOnline(void)
+	{
+		return isOnline_;
+	}
+
+	inline bool hasUpdate(void)
+	{
+		return hasUpdate_;
+	}
+
+	inline bool stopEventLoop(void)
+	{
+		return stopEventLoop_;
+	}
+
+	inline bool isPrimaryThread(void)
+	{
+		return isPrimaryThread_;
+	}
+
+	inline void setAcceptingQueue(bool val)
+	{
+		isAcceptingQueue_ = val;
+	}
+
+	inline bool isAcceptingQueue(void)
+	{
+		return isAcceptingQueue_;
+	}
+
+	inline std::thread *getThread(void)
+	{
+		return thread_;
+	}
+
+	inline std::mutex *getUpdateQueueMutex(void)
+	{
+		return updateQueueMutex_;
+	}
+
+	inline std::condition_variable *getUpdateCond(void)
+	{
+		return updateCond_;
+	}
+
+	inline std::queue<td_api::updateNewMessage> *getUpdateQueue(void)
+	{
+		return &updateQueue_;
+	}
 private:
 	Main *main_;
 	uint32_t idx_;
-	std::thread *thread_ = nullptr;
 
-	bool stop_ = false;
-	bool isBusy_ = false;
 	bool isOnline_ = false;
+	bool hasUpdate_ = false;
+	bool stopEventLoop_ = true;
+	bool isPrimaryThread_ = false;
+	bool isAcceptingQueue_ = false;
 
+	std::thread *thread_ = nullptr;
+	std::mutex *updateQueueMutex_ = nullptr;
+	std::condition_variable *updateCond_ = nullptr;
+	std::queue<td_api::updateNewMessage> updateQueue_;
+
+	void runWorker(void);
+	void processQueue(td_api::updateNewMessage update);
+	void handleQueue(std::unique_lock<std::mutex> &lock);
+	bool waitForEvent(std::unique_lock<std::mutex> &lock);
 	void internalWorker(void);
+	void internalWorkerPrimary(void);
 };
 
 

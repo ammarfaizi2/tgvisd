@@ -62,7 +62,9 @@ void Td::loop(int timeout)
 
 void Td::close(void)
 {
-
+	send_query(td_api::make_object<td_api::close>(), {});
+	std::cout << "Waiting for authorizationStateClosed..." << std::endl;
+	loop(5);
 }
 
 
@@ -120,7 +122,7 @@ void Td::on_authorization_state_update(void)
 	};
 
 	auto as_closing = [this](td_api::authorizationStateClosing &) {
-		std::cout << "Closing" << std::endl;
+		std::cout << "Closing TdLib..." << std::endl;
 	};
 
 	auto as_closed = [this](td_api::authorizationStateClosed &) {
