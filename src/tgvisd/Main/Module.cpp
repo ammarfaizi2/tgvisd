@@ -49,15 +49,24 @@ void Module::shutdownModule()
 
 void Module::enumerate(Main *main, td_api::updateNewMessage &update)
 {
+	size_t i = 0;
 	module_res_t ret;
 	tgvisd::Modules::Base **modTbl = moduleTable_, *mod;
 
 	while ((mod = *modTbl++)) {
+		i++;
 		ret = mod->handleUpdate(main, update);
 		switch (ret) {
 		case MRT_STOP:
 			goto out;
 		case MRT_CONTINUE:
+			if (!update.get_id()) {
+				printf("PANIC!!!\n");
+				printf("Fatal: handleUpdate() moved the `update` pointer but returned MRT_CONTINUE\n");
+				printf("File: %s:%d\n", __FILE__, __LINE__);
+				printf("Iterator count: %zu\n", i);
+				abort();
+			}
 			break;
 		}
 	}

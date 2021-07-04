@@ -65,7 +65,7 @@ module_res_t Shell::handleUpdate(tgvisd::Main::Main *main,
 		cstr += 3;
 		main->incRef();
 		std::thread shellThread(doShellExec, main, std::move(update),
-					cstr, text.c_str());
+					cstr, text.length());
 		shellThread.detach();
 	}
 
