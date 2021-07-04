@@ -14,7 +14,8 @@
 #include <tgvisd/Main/Main.hpp>
 
 typedef enum module_res_t_ {
-	MRT_SKIP_MODULE
+	MRT_STOP,
+	MRT_CONTINUE,
 } module_res_t;
 
 namespace tgvisd::Modules {
@@ -42,9 +43,9 @@ public:
 	}
 
 	virtual module_res_t handleUpdate(tgvisd::Main::Main *main,
-					  td_api::updateNewMessage &update_)
+					  td_api::updateNewMessage &update)
 	{
-		return MRT_SKIP_MODULE;
+		return MRT_CONTINUE;
 	}
 
 protected:

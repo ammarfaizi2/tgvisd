@@ -11,6 +11,7 @@
 #define TGVISD__MAIN__MAIN_HPP
 
 #include <stack>
+#include <atomic>
 #include <tgvisd/Td/Td.hpp>
 
 namespace tgvisd::Main {
@@ -48,12 +49,23 @@ public:
 		return module_;
 	}
 
+	inline size_t incRef(void)
+	{
+		return atomic_fetch_add(&myRef_, 1);
+	}
+
+	inline size_t decRef(void)
+	{
+		return atomic_fetch_sub(&myRef_, 1);
+	}
+
 private:
 	tgvisd::Td::Td td_;
 	uint32_t maxWorkerNum_;
 	uint32_t hardwareConcurrency_;
 	Worker *threads_ = nullptr;
 	Module *module_ = nullptr;
+	std::atomic<size_t> myRef_ = 0;
 
 	bool stopUpdate_ = false;
 

@@ -55,10 +55,15 @@ void Module::enumerate(Main *main, td_api::updateNewMessage &update)
 	while ((mod = *modTbl++)) {
 		ret = mod->handleUpdate(main, update);
 		switch (ret) {
-		case MRT_SKIP_MODULE:
+		case MRT_STOP:
+			goto out;
+		case MRT_CONTINUE:
 			break;
 		}
 	}
+
+out:
+	return;
 }
 
 } /* namespace tgvisd::Main */
