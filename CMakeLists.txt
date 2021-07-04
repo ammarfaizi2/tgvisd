@@ -17,17 +17,25 @@ set(TGVISD_TD_SOURCE
 	src/tgvisd/Td/Td.cpp
 )
 
+# Modules
+set(TGVISD_MODULES_SOURCE
+  src/tgvisd/Modules/Base.hpp
+  src/tgvisd/Modules/Shell/Shell.cpp
+  src/tgvisd/Modules/Shell/Shell.hpp
+)
 
 
 # Main
 set(TGVISD_MAIN_SOURCE
   src/tgvisd/main.cpp
-	src/tgvisd/Main/Main.cpp
+  src/tgvisd/Main/Main.cpp
   src/tgvisd/Main/Main.hpp
+  src/tgvisd/Main/Module.cpp
+  src/tgvisd/Main/Module.hpp
   src/tgvisd/Main/Worker.cpp
   src/tgvisd/Main/Worker.hpp
+  ${TGVISD_MODULES_SOURCE}
 )
-
 
 
 # Build the shared library that contains tdlib core.

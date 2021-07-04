@@ -15,6 +15,8 @@
 
 namespace tgvisd::Main {
 
+class Module;
+
 class Worker;
 
 class Main {
@@ -41,11 +43,17 @@ public:
 		return stopUpdate_;
 	}
 
+	inline Module *getModule(void)
+	{
+		return module_;
+	}
+
 private:
 	tgvisd::Td::Td td_;
 	uint32_t maxWorkerNum_;
 	uint32_t hardwareConcurrency_;
 	Worker *threads_ = nullptr;
+	Module *module_ = nullptr;
 
 	bool stopUpdate_ = false;
 

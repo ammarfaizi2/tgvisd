@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "Main.hpp"
+#include "Module.hpp"
 #include "Worker.hpp"
 
 namespace tgvisd::Main {
@@ -157,16 +158,16 @@ void Worker::runWorker(void)
 void Worker::handleUpdate(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
-	pr_debug("Proessing event on thread %u (sleep %u)...", idx_, trand);
+	pr_debug("Proessing event on thread %u...", idx_);
+	main_->getModule()->enumerate(main_, update_);
 	pr_debug("Thread %u has finished its job!", idx_);
+	hasUpdate_ = false;
 }
 
 
 bool Worker::waitForEvent(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
-	auto now = std::chrono::system_clock::now();
-
 	return updateCond_->wait_for(lock, 1000ms, [this](void){
 		return this->hasUpdate_ || this->stopEventLoop_;
 	});

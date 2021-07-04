@@ -55,6 +55,7 @@ public:
 	{
 		assert(updateCond_);
 		assert(updateMutex_);
+		assert(hasUpdate_ == false);
 
 		updateMutex_->lock();
 		update_ = std::move(update);
@@ -125,4 +126,3 @@ private:
 } /* namespace tgvisd::Main */
 
 #endif /* #ifndef TGVISD__MAIN__WORKER_HPP */
-

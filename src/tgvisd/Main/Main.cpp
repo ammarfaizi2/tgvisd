@@ -12,6 +12,7 @@
 #include <iostream>
 
 #include "Main.hpp"
+#include "Module.hpp"
 #include "Worker.hpp"
 
 
@@ -69,6 +70,11 @@ namespace tgvisd::Main {
 static void updateNewMessage(Main *main, td_api::updateNewMessage &update);
 
 
+static Module *gModule = nullptr;
+static uint32_t gModuleRefCount = 0;
+static std::mutex gModuleMutex;
+
+
 Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	td_(api_id, api_hash, data_path)
 {
@@ -81,6 +87,16 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
 		updateNewMessage(this, update);
 	};
+
+
+	gModuleMutex.lock();
+	if (!gModule) {
+		assert(gModuleRefCount == 0);
+		gModule = new Module;
+	}
+	gModuleRefCount++;
+	module_ = gModule;
+	gModuleMutex.unlock();
 
 
 	/*
@@ -131,6 +147,15 @@ Main::~Main(void)
 		delete[] threads_;
 
 	td_.close();
+
+	gModuleMutex.lock();
+	assert(gModule != nullptr);
+	if (--gModuleRefCount == 0) {
+		delete gModule;
+		gModule = nullptr;
+	}
+	module_ = nullptr;
+	gModuleMutex.unlock();
 
 #if defined(__linux__)
 	/*
@@ -234,6 +259,7 @@ static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 {
 	Worker *worker;
 
+
 	if (unlikely(main->stopUpdate())) {
 		/*
 		 * Sorry, we are in the destruction time.
@@ -265,6 +291,7 @@ static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 		goto out_work;
 
 
+
 	/*
 	 * All primary workers are busy. Let's
 	 * give the update to the extra worker.
@@ -272,6 +299,7 @@ static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 	worker = main->getExtraWorker();
 	if (likely(worker))
 		goto out_work;
+
 
 
 	/*
