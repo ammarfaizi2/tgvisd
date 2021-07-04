@@ -279,6 +279,7 @@ static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 	 *
 	 * TODO: Handle extra queue for this event.
 	 */
+	pr_debug("Dropping update because all threads are busy...");
 	return;
 
 
