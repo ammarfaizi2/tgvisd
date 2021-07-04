@@ -50,13 +50,11 @@ void Td::loop(int timeout)
 		return;
 	}
 
-	while (true) {
-		auto response = client_manager_->receive(timeout);
-		if (!response.object)
-			break;
+	auto response = client_manager_->receive(timeout);
+	if (!response.object)
+		return;
 
-		process_response(std::move(response));
-	}
+	process_response(std::move(response));
 }
 
 

@@ -100,7 +100,7 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	threads_ = new Worker[maxWorkerNum_];
 
 	pr_debug("Hardware concurrency number is %u", hc);
-	pr_debug("Max worker number is %u", maxWorkerNum_);
+	pr_debug("Max number of workers is %u", maxWorkerNum_);
 
 	for (size_t i = 0; i < maxWorkerNum_; i++) {
 		threads_[i].__construct(this, i, i < hc);

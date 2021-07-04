@@ -157,22 +157,16 @@ void Worker::runWorker(void)
 void Worker::handleUpdate(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
-	FILE *handle = fopen("/dev/urandom", "rb");
-	unsigned int trand;
-	fread(&trand, sizeof(unsigned int), 1, handle);
-	fclose(handle);
-
-	trand %= 20;
-	printf("Proessing event on thread %u (sleep %u)...\n", idx_, trand);
-	sleep(trand);
-	printf("Thread %u has finished its job!\n", idx_);
-	hasUpdate_ = false;
+	pr_debug("Proessing event on thread %u (sleep %u)...", idx_, trand);
+	pr_debug("Thread %u has finished its job!", idx_);
 }
 
 
 bool Worker::waitForEvent(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
+	auto now = std::chrono::system_clock::now();
+
 	return updateCond_->wait_for(lock, 1000ms, [this](void){
 		return this->hasUpdate_ || this->stopEventLoop_;
 	});
