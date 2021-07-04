@@ -19,36 +19,68 @@
 #define __must_hold(MUTEX)
 #define __releases(MUTEX)
 #define __acquires(MUTEX)
+#define likely(EXPR)	__builtin_expect((bool)(EXPR), 1)
+#define unlikely(EXPR)	__builtin_expect((bool)(EXPR), 0)
+
+#define print_nl(...)		\
+do {				\
+	printf(__VA_ARGS__);	\
+	putchar('\n');		\
+} while (0)
+
+#define print_arg(...) print_nl(__VA_ARGS__)
+
+#define pr_debug print_arg
+#define pr_notice print_arg
+#define pr_warn print_arg
+#define pr_err print_arg
+#define pr_error print_arg
 
 namespace tgvisd::Main {
 
+
 class Main;
+
 
 class Worker
 {
 public:
-	constexpr static uint32_t maxQueue = 15;
-
 	Worker(void);
 	~Worker(void);
-	void __construct(Main *main, uint32_t idx, bool isPrimaryThread);
+	void __construct(Main *main, uint32_t idx, bool isPrimaryWorker);
 	void spawn(void);
 	void close(void);
 
-	inline void sendUpdateQueue(td_api::updateNewMessage &update)
+	inline void sendUpdate(td_api::updateNewMessage &update)
 	{
 		assert(updateCond_);
-		assert(updateQueueMutex_);
+		assert(updateMutex_);
 
-		updateQueueMutex_->lock();
-		updateQueue_.push(std::move(update));
-		updateQueueMutex_->unlock();
+		updateMutex_->lock();
+		update_ = std::move(update);
+		hasUpdate_ = true;
+		updateMutex_->unlock();
 		updateCond_->notify_one();
 	}
 
 	inline uint32_t getIndex(void)
 	{
 		return idx_;
+	}
+
+	inline bool isPrimaryWorker(void)
+	{
+		return isPrimaryWorker_;
+	}
+
+	inline std::mutex *getUpdateMutex(void)
+	{
+		return updateMutex_;
+	}
+
+	inline std::condition_variable *getUpdateCond(void)
+	{
+		return updateCond_;
 	}
 
 	inline bool isOnline(void)
@@ -66,65 +98,31 @@ public:
 		return stopEventLoop_;
 	}
 
-	inline bool isPrimaryThread(void)
-	{
-		return isPrimaryThread_;
-	}
-
-	inline void setAcceptingQueue(bool val)
-	{
-		isAcceptingQueue_ = val;
-	}
-
-	inline bool isAcceptingQueue(void)
-	{
-		return isAcceptingQueue_;
-	}
-
-	inline std::thread *getThread(void)
-	{
-		return thread_;
-	}
-
-	inline std::mutex *getUpdateQueueMutex(void)
-	{
-		return updateQueueMutex_;
-	}
-
-	inline std::condition_variable *getUpdateCond(void)
-	{
-		return updateCond_;
-	}
-
-	inline std::queue<td_api::updateNewMessage> *getUpdateQueue(void)
-	{
-		return &updateQueue_;
-	}
 private:
-	Main *main_;
-	uint32_t idx_;
+	Main *main_ = nullptr;
+	uint32_t idx_ = ~0;
+	bool isPrimaryWorker_ = false;
+
+	td_api::updateNewMessage update_;
+
+	std::thread *thread_ = nullptr;
+	std::mutex *updateMutex_ = nullptr;
+	std::condition_variable *updateCond_ = nullptr;
 
 	bool isOnline_ = false;
 	bool hasUpdate_ = false;
 	bool stopEventLoop_ = true;
-	bool isPrimaryThread_ = false;
-	bool isAcceptingQueue_ = false;
 
-	std::thread *thread_ = nullptr;
-	std::mutex *updateQueueMutex_ = nullptr;
-	std::condition_variable *updateCond_ = nullptr;
-	std::queue<td_api::updateNewMessage> updateQueue_;
-
+	void doSpawn(void);
 	void runWorker(void);
-	void processQueue(td_api::updateNewMessage update);
-	void handleQueue(std::unique_lock<std::mutex> &lock);
-	bool waitForEvent(std::unique_lock<std::mutex> &lock);
 	void internalWorker(void);
 	void internalWorkerPrimary(void);
+	bool waitForEvent(std::unique_lock<std::mutex> &lock);
+	void handleUpdate(std::unique_lock<std::mutex> &lock);
 };
 
 
 } /* namespace tgvisd::Main */
 
-
 #endif /* #ifndef TGVISD__MAIN__WORKER_HPP */
+

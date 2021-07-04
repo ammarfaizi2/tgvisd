@@ -16,7 +16,6 @@
 
 namespace tgvisd::Main {
 
-
 using namespace std::chrono_literals;
 
 
@@ -26,15 +25,16 @@ Worker::Worker(void):
 }
 
 
-void Worker::__construct(Main *main, uint32_t idx, bool isPrimaryWorker)
+void Worker::__construct(Main *main, uint32_t idx, bool isPrimaryThread)
 {
 	assert(main);
+	assert(updateQueue_.empty());
 
-	main_ = main;
 	idx_ = idx;
-	isPrimaryWorker_ = isPrimaryWorker;
-	updateMutex_ = new std::mutex;
+	main_ = main;
+	isPrimaryThread_ = isPrimaryThread;
 	updateCond_ = new std::condition_variable;
+	updateMutex_ = new std::mutex;
 }
 
 
@@ -70,52 +70,17 @@ void Worker::close(void)
 }
 
 
-void Worker::spawn(void)
-{
-	assert(updateMutex_);
-	assert(updateCond_);
-
-	if (unlikely(isOnline_))
-		/*
-		 * We already have online thread.
-		 * No need to spawn!
-		 */
-		return;
-
-
-	if (thread_) {
-		/*
-		 * We have the std::thread instance.
-		 * But the thread has gone offline.
-		 * Let's recreate it!
-		 */
-
-		/*
-		 * Offline thread must not run
-		 * the event loop!
-		 */
-		assert(stopEventLoop_ == true);
-
-		thread_->join();
-		delete thread_;
-		thread_ = nullptr;
-	}
-
-	doSpawn();
-}
-
-
-void Worker::doSpawn(void)
-	__acquires(updateMutex_)
-	__releases(updateMutex_)
+void Worker::doSpawn()
 {
 	std::unique_lock<std::mutex> lock(*updateMutex_);
 
-	assert(isOnline_ == false);
+	assert(this->isOnline_ == false);
 
-	pr_debug("Spawning thread %u...", idx_);
+	/*
+	 * Spawn a thread for this worker.
+	 */
+	printf("Spawning thread %u...\n", idx_);
 	thread_ = new std::thread([this](void){
-
 		this->stopEventLoop_ = false;
 		this->isOnline_ = true;
 		this->updateCond_->notify_one();
@@ -129,49 +94,95 @@ void Worker::doSpawn(void)
 		assert(this->stopEventLoop_ == true);
 	});
 
-
-	/*
-	 * Wait for thread to be ready.
-	 */
 	while (!this->isOnline_) {
 		updateCond_->wait(lock, [this](void){
 			return this->isOnline_;
 		});
 	}
-	pr_debug("Thread %u is ready!", idx_);
+}
+
+
+void Worker::spawn(void)
+{
+	/*
+	 * We must have Main::Main instance at this point!
+	 */
+	assert(main_);
+
+	if (isOnline_) {
+		/*
+		 * We are having an online thread.
+		 * No need to spawn!
+		 */
+		assert(thread_);
+		return;
+	}
+
+	if (thread_) {
+		/*
+		 * We have already had std::thread instance.
+		 * But it goes offline, let's recreate it!
+		 */
+		assert(stopEventLoop_ == true);
+		thread_->join();
+		delete thread_;
+		thread_ = nullptr;
+	}
+
+	doSpawn();
 }
 
 
 void Worker::runWorker(void)
 {
-	if (isPrimaryWorker_)
+	printf("Thread %u is ready!\n", idx_);
+
+	if (isPrimaryThread_)
 		internalWorkerPrimary();
 	else
 		internalWorker();
 
 	assert(stopEventLoop_ == true);
-	pr_debug("Thread %u exited!", idx_);
+	printf("Thread %u exited!\n", idx_);
 }
 
 
-void Worker::handleUpdate(std::unique_lock<std::mutex> &lock)
-	__must_hold(updateMutex_)
+void Worker::processQueue(td_api::updateNewMessage update)
 {
 	FILE *handle = fopen("/dev/urandom", "rb");
 	unsigned int trand;
 	fread(&trand, sizeof(unsigned int), 1, handle);
-	fclose(handle);
 
-	trand %= 20;
+	trand %= 3;
 	printf("Proessing event on thread %u (sleep %u)...\n", idx_, trand);
 	sleep(trand);
 	printf("Thread %u has finished its job!\n", idx_);
-	hasUpdate_ = false;
+}
+
+
+void Worker::handleQueue(std::unique_lock<std::mutex> &lock)
+	__must_hold(&lock)
+{
+	while (!updateQueue_.empty()) {
+		td_api::updateNewMessage update = std::move(updateQueue_.front());
+		updateQueue_.pop();
+
+		/* TODO: Explain why do I unlock the mutex here. */
+		lock.unlock();
+		processQueue(std::move(update));
+		lock.lock();
+		printf("Remaining queue on thread %u = %zu\n", idx_, updateQueue_.size());
+	}
+
+	if (!isAcceptingQueue_) {
+		isAcceptingQueue_ = true;
+		main_->addFreeWorker(this);
+	}
 }
 
 
 bool Worker::waitForEvent(std::unique_lock<std::mutex> &lock)
-	__must_hold(updateMutex_)
+	__must_hold(&lock)
 {
 	return updateCond_->wait_for(lock, 1000ms, [this](void){
 		return this->hasUpdate_ || this->stopEventLoop_;
@@ -185,23 +196,17 @@ void Worker::internalWorkerPrimary(void)
 {
 	std::unique_lock<std::mutex> lock(*updateMutex_);
 
-	while (likely(!stopEventLoop_)) {
+	while (__builtin_expect(!stopEventLoop_, 1)) {
 
 		/*
-		 * I am a primary worker, I don't
+		 * I am a primary thread, I don't
 		 * care about timeout. I am always
 		 * online until the program ends.
 		 */
 		if (!waitForEvent(lock))
 			continue;
 
-		if (unlikely(stopEventLoop_))
-			break;
-
-		assert(hasUpdate_ == true);
-		handleUpdate(lock);
-		assert(hasUpdate_ == false);
-		main_->putPrimaryWorker(this);
+		handleQueue(lock);
 	}
 }
 
@@ -211,10 +216,10 @@ void Worker::internalWorker(void)
 	__releases(updateMutex_)
 {
 	uint32_t timeoutCounter = 0;
-	constexpr uint32_t maxTimeoutCount = 20; /* Absolute timeout */
+	constexpr uint32_t maxTimeoutCount = 20;
 	std::unique_lock<std::mutex> lock(*updateMutex_);
 
-	while (likely(!stopEventLoop_)) {
+	while (__builtin_expect(!stopEventLoop_, 1)) {
 
 		if (!waitForEvent(lock)) {
 			if (++timeoutCounter < maxTimeoutCount)
@@ -223,7 +228,7 @@ void Worker::internalWorker(void)
 			/*
 			 * I have reached my absolute timeout
 			 * while waiting for events. I am not
-			 * a primary worker neither.
+			 * a primary thread neither.
 			 *
 			 * So it is fine for me to exit because
 			 * there is no activity for me.
@@ -238,17 +243,10 @@ void Worker::internalWorker(void)
 			break;
 		}
 
-		if (unlikely(stopEventLoop_))
-			break;
-
-		assert(hasUpdate_ == true);
-		handleUpdate(lock);
-		assert(hasUpdate_ == false);
-		main_->putExtraWorker(this);
+		handleQueue(lock);
 		timeoutCounter = 0;
 	}
 }
 
 
 } /* namespace tgvisd::Main */
-

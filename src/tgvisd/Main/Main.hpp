@@ -20,31 +20,40 @@ class Worker;
 class Main {
 
 public:
-	Worker *threads = nullptr;
-
 	Main(uint32_t api_id, const char *api_hash, const char *data_path);
 	~Main(void);
 	void run(void);
-	int64_t freeThreadIndex(uint32_t idx);
-	int64_t getFreeThreadIndex(void);
-	Worker *getFreeWorker(void);
-	void addFreeWorker(Worker *thread);
+
+	Worker *getPrimaryWorker(void);
+	void putPrimaryWorker(Worker *worker);
+
+	Worker *getExtraWorker(void);
+	void putExtraWorker(Worker *worker);
 
 
 	inline tgvisd::Td::Td *getTd(void)
 	{
 		return &td_;
 	}
+
+	inline bool stopUpdate(void)
+	{
+		return stopUpdate_;
+	}
+
 private:
-	constexpr static size_t max_thread_num = 128;
-
 	tgvisd::Td::Td td_;
+	uint32_t maxWorkerNum_;
+	uint32_t hardwareConcurrency_;
+	Worker *threads_ = nullptr;
 
-	/* Mutex to lock the stack below. */
-	std::mutex workerStackMutex_;
+	bool stopUpdate_ = false;
 
-	/* It saves the free thread indexes. */
-	std::stack<uint32_t> workerStack_;
+	std::mutex primaryWorkerStackMutex;
+	std::stack<uint32_t> primaryWorkerStack;
+
+	std::mutex extraWorkerStackMutex;
+	std::stack<uint32_t> extraWorkerStack;
 
 	void spawnThreads(void);
 };

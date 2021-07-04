@@ -87,32 +87,48 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	 * Initialize workers.
 	 *
 	 * Don't spawn all workers at once, only spawn
-	 * small number of it. If the workers are all
-	 * busy while queue is being enqueued, then
-	 * spawn more workers.
+	 * small number of them. When the online workers
+	 * are all busy and we got more queue, then spawn
+	 * more workers.
 	 */
 	hc = std::thread::hardware_concurrency();
 	if (!hc)
 		hc = 2;
 
-	threads = new Worker[max_thread_num];
-	for (size_t i = 0; i < max_thread_num; i++) {
-		threads[i].__construct(this, i, i < hc);
+	maxWorkerNum_ = hc * 100;
+	hardwareConcurrency_ = hc;
+	threads_ = new Worker[maxWorkerNum_];
+
+	pr_debug("Hardware concurrency number is %u", hc);
+	pr_debug("Max worker number is %u", maxWorkerNum_);
+
+	for (size_t i = 0; i < maxWorkerNum_; i++) {
+		threads_[i].__construct(this, i, i < hc);
 		if (i < hc)
-			threads[i].spawn();
+			threads_[i].spawn();
 	}
 
-	for (size_t i = max_thread_num; i--;) {
-		threads[i].setAcceptingQueue(true);
-		addFreeWorker(&threads[i]);
+	for (size_t i = hc; i--;) {
+		assert(threads_[i].getIndex() == i);
+		putPrimaryWorker(&threads_[i]);
 	}
+
+	for (size_t i = maxWorkerNum_; i-- > hc;) {
+		assert(threads_[i].getIndex() == i);
+		putExtraWorker(&threads_[i]);
+	}
+
+	assert(primaryWorkerStack.size() == hc);
+	assert(extraWorkerStack.size() == (maxWorkerNum_ - hc));
 }
 
 
 Main::~Main(void)
 {
-	if (threads)
-		delete[] threads;
+	stopUpdate_ = true;
+
+	if (threads_)
+		delete[] threads_;
 
 	td_.close();
 
@@ -124,39 +140,6 @@ Main::~Main(void)
 	printf("Syncing...\n");
 	sync();
 #endif
-}
-
-
-void Main::addFreeWorker(Worker *thread)
-	__acquires(&workerStackMutex_)
-	__releases(&workerStackMutex_)
-{
-	workerStackMutex_.lock();
-	assert(thread->isAcceptingQueue());
-	workerStack_.push(thread->getIndex());
-	assert(workerStack_.size() <= max_thread_num);
-	workerStackMutex_.unlock();
-}
-
-
-Worker *Main::getFreeWorker(void)
-	__acquires(&workerStackMutex_)
-	__releases(&workerStackMutex_)
-{
-	uint32_t idx;
-	Worker *ret = nullptr;
-	workerStackMutex_.lock();
-	if (__builtin_expect(!workerStack_.empty(), 1)) {
-		idx = workerStack_.top();
-		ret = &threads[idx];
-
-		if (ret->getUpdateQueue()->size() >= Worker::maxQueue) {
-			workerStack_.pop();
-			ret->setAcceptingQueue(false);
-		}
-	}
-	workerStackMutex_.unlock();
-	return ret;
 }
 
 
@@ -173,32 +156,139 @@ void Main::run(void)
 		 * when we get interrupted. For example, if
 		 * the user presses CTRL + C (got SIGINT).
 		 */
-		if (__builtin_expect(is_signaled, 0))
+		if (__builtin_expect(is_signaled, 0)) {
+			stopUpdate_ = true;
 			break;
+		}
 #endif
 		td_.loop(timeout);
 	}
 }
 
 
+Worker *Main::getPrimaryWorker(void)
+	__acquires(primaryWorkerStackMutex)
+	__releases(primaryWorkerStackMutex)
+{
+	uint32_t idx;
+	Worker *ret = nullptr;
+	primaryWorkerStackMutex.lock();
+	if (likely(!primaryWorkerStack.empty())) {
+		idx = primaryWorkerStack.top();
+		ret = &threads_[idx];
+		primaryWorkerStack.pop();
+	}
+	primaryWorkerStackMutex.unlock();
+	return ret;
+}
+
+
+void Main::putPrimaryWorker(Worker *worker)
+	__acquires(primaryWorkerStackMutex)
+	__releases(primaryWorkerStackMutex)
+{
+	uint32_t idx;
+	primaryWorkerStackMutex.lock();
+	assert(worker->hasUpdate() == false);
+	assert(primaryWorkerStack.size() <= hardwareConcurrency_);
+	idx = worker->getIndex();
+	assert(idx < hardwareConcurrency_);
+	primaryWorkerStack.push(idx);
+	primaryWorkerStackMutex.unlock();
+}
+
+
+Worker *Main::getExtraWorker(void)
+	__acquires(extraWorkerStackMutex)
+	__releases(extraWorkerStackMutex)
+{
+	uint32_t idx;
+	Worker *ret = nullptr;
+	extraWorkerStackMutex.lock();
+	if (likely(!extraWorkerStack.empty())) {
+		idx = extraWorkerStack.top();
+		ret = &threads_[idx];
+		extraWorkerStack.pop();
+	}
+	extraWorkerStackMutex.unlock();
+	return ret;
+}
+
+
+void Main::putExtraWorker(Worker *worker)
+	__acquires(extraWorkerStackMutex)
+	__releases(extraWorkerStackMutex)
+{
+	uint32_t idx;
+	extraWorkerStackMutex.lock();
+	assert(worker->hasUpdate() == false);
+	assert(extraWorkerStack.size() <= (maxWorkerNum_ - hardwareConcurrency_));
+	idx = worker->getIndex();
+	assert(idx >= hardwareConcurrency_);
+	extraWorkerStack.push(idx);
+	extraWorkerStackMutex.unlock();
+}
+
+
 static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 {
-	Worker *thread;
+	Worker *worker;
 
-	thread = main->getFreeWorker();
-	if (__builtin_expect(!thread, 0)) {
+	if (unlikely(main->stopUpdate())) {
 		/*
-		 * All threads are busy!
+		 * Sorry, we are in the destruction time.
 		 *
-		 * TODO: Handle this event!
+		 * Don't give it to workers, it might
+		 * fault because the workers are being
+		 * destroyed at this point!
+		 *
+		 * What is the bad thing here?
+		 * We lose this update.
+		 *
+		 * TODO: Make sure Td doesn't give any
+		 *       update when `stopUpdate_` is
+		 *       true, so we don't lose it!
 		 */
+		pr_debug("Dropping update due to destruction time...");
 		return;
 	}
 
-	thread->sendUpdateQueue(update);
 
-	if (!thread->isOnline())
-		thread->spawn();
+
+	/*
+	 * Always prioritize the primary workers
+	 * first. If they are all busy, throw it
+	 * to the extra workers.
+	 */
+	worker = main->getPrimaryWorker();
+	if (likely(worker))
+		goto out_work;
+
+
+	/*
+	 * All primary workers are busy. Let's
+	 * give the update to the extra worker.
+	 */
+	worker = main->getExtraWorker();
+	if (likely(worker))
+		goto out_work;
+
+
+	/*
+	 * All workers are all busy.
+	 *
+	 * TODO: Handle extra queue for this event.
+	 */
+	return;
+
+
+out_work:
+	worker->sendUpdate(update);
+	if (!worker->isOnline())
+		/*
+		 * The worker is offline, let's give it a life.
+		 */
+		worker->spawn();
 }
 
 
