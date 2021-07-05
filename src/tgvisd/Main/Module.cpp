@@ -39,10 +39,10 @@ void Module::shutdownModule()
 {
 	tgvisd::Modules::Base **modTbl = moduleTable_, *mod;
 
-	while ((mod = *modTbl++)) {
+	while ((mod = *modTbl)) {
 		mod->shutdown();
 		delete mod;
-		modTbl[-1] = nullptr;
+		*modTbl++ = nullptr;
 	}
 }
 

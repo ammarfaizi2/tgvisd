@@ -121,7 +121,7 @@ void Worker::doSpawn(void)
 		this->isOnline_ = true;
 		this->updateCond_->notify_one();
 		this->runWorker();
-		this->isOnline_ = false;
+		assert(isOnline_ == false);
 
 		/*
 		 * When the worker returns, the event
@@ -144,12 +144,19 @@ void Worker::doSpawn(void)
 
 
 void Worker::runWorker(void)
+	__acquires(updateMutex_)
+	__releases(updateMutex_)
 {
-	if (isPrimaryWorker_)
-		internalWorkerPrimary();
-	else
-		internalWorker();
+	std::unique_lock<std::mutex> lock(*updateMutex_);
+	assert(isOnline_ == true);
 
+	if (isPrimaryWorker_)
+		internalWorkerPrimary(lock);
+	else
+		internalWorker(lock);
+
+	isOnline_ = false;
+	assert(hasUpdate_ == false);
 	assert(stopEventLoop_ == true);
 	pr_debug("Thread %u exited!", idx_);
 }
@@ -174,12 +181,9 @@ bool Worker::waitForEvent(std::unique_lock<std::mutex> &lock)
 }
 
 
-void Worker::internalWorkerPrimary(void)
-	__acquires(updateMutex_)
-	__releases(updateMutex_)
+void Worker::internalWorkerPrimary(std::unique_lock<std::mutex> &lock)
+	__must_hold(updateMutex_)
 {
-	std::unique_lock<std::mutex> lock(*updateMutex_);
-
 	while (likely(!stopEventLoop_)) {
 
 		/*
@@ -201,18 +205,16 @@ void Worker::internalWorkerPrimary(void)
 }
 
 
-void Worker::internalWorker(void)
-	__acquires(updateMutex_)
-	__releases(updateMutex_)
+void Worker::internalWorker(std::unique_lock<std::mutex> &lock)
+	__must_hold(updateMutex_)
 {
 	uint32_t timeoutCounter = 0;
 	constexpr uint32_t maxTimeoutCount = 20; /* Absolute timeout */
-	std::unique_lock<std::mutex> lock(*updateMutex_);
 
 	while (likely(!stopEventLoop_)) {
 
 		if (!waitForEvent(lock)) {
-			if (++timeoutCounter < maxTimeoutCount)
+			if (likely(++timeoutCounter < maxTimeoutCount))
 				continue;
 
 			/*

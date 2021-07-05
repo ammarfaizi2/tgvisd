@@ -116,10 +116,10 @@ private:
 
 	void doSpawn(void);
 	void runWorker(void);
-	void internalWorker(void);
-	void internalWorkerPrimary(void);
 	bool waitForEvent(std::unique_lock<std::mutex> &lock);
 	void handleUpdate(std::unique_lock<std::mutex> &lock);
+	void internalWorker(std::unique_lock<std::mutex> &lock);
+	void internalWorkerPrimary(std::unique_lock<std::mutex> &lock);
 };
 
 
