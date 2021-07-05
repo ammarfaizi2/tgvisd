@@ -7,17 +7,16 @@
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
-
 #ifndef TAKE_MODULE_TABLE_DEFINITION
 
-#include <tgvisd/Modules/Base.hpp>
-#include <tgvisd/Modules/Shell/Shell.hpp>
+#include <tgvisd/Modules/BasePreload.hpp>
+
+using tgvisd::Modules::BasePreload;
 
 #else /* #ifdef TAKE_MODULE_TABLE_DEFINITION */
 
-
-tgvisd::Modules::Base *moduleTable_[2] = {
-	new Modules::Shell::Shell(),
+BasePreload *moduleTablePreload_[2] = {
+	nullptr,
 	nullptr
 };
 

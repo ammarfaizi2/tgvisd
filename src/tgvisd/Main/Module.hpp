@@ -12,7 +12,8 @@
 
 #include <tgvisd/Td/Td.hpp>
 
-#include "ModuleTable.hpp"
+#include "ModuleTablePreload.hpp"
+#include "ModuleTableEnumerate.hpp"
 
 namespace tgvisd::Main {
 
@@ -30,8 +31,10 @@ private:
 
 
 #define TAKE_MODULE_TABLE_DEFINITION
-#include "ModuleTable.hpp"
+#include "ModuleTablePreload.hpp"
+#include "ModuleTableEnumerate.hpp"
 #undef TAKE_MODULE_TABLE_DEFINITION
+
 };
 
 } /* namespace tgvisd::Main */

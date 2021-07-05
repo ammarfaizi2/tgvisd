@@ -12,7 +12,18 @@
 #include <cstring>
 #include "Shell.hpp"
 
-namespace tgvisd::Modules::Shell {
+namespace tgvisd::Modules::Enumerate {
+
+
+Shell::Shell(void)
+{	
+}
+
+
+Shell::~Shell(void)
+{
+}
+
 
 int Shell::init(void)
 {
@@ -33,33 +44,33 @@ static void doShellExec(tgvisd::Main::Main *main,
 			size_t cmdLen);
 
 
-module_res_t Shell::handleUpdate(tgvisd::Main::Main *main,
-				 td_api::updateNewMessage &update)
+mbe_ret_t Shell::handleUpdate(tgvisd::Main::Main *main,
+			      td_api::updateNewMessage &update)
 {
 	auto &update_ = update;
 	auto &message = update_.message_;
 	auto &content = *(message->content_);
 
 	if (message->content_->get_id() != td_api::messageText::ID)
-		return MRT_CONTINUE;
-
+		return MBE_CONTINUE;
 
 	std::string &text = static_cast<td_api::messageText &>(content).text_->text_;
 	char c;
 	const char *cstr = text.c_str();
 
 	if (text.length() < 4)
-		return MRT_CONTINUE;
+		return MBE_CONTINUE;
 
 	c = *cstr++;
 	if (!(c == '!' || c == '/' || c == '~' || c == '.'))
-		return MRT_CONTINUE;
+		return MBE_CONTINUE;
 
 	if (!(cstr[0] == 's' && cstr[1] == 'h'))
-		return MRT_CONTINUE;
+		return MBE_CONTINUE;
 
 	if (!isspace((unsigned)cstr[2]))
-		return MRT_CONTINUE;
+		return MBE_CONTINUE;
+
 
 	{
 		cstr += 3;
@@ -69,7 +80,7 @@ module_res_t Shell::handleUpdate(tgvisd::Main::Main *main,
 		shellThread.detach();
 	}
 
-	return MRT_STOP;
+	return MBE_BREAK;
 }
 
 
@@ -83,4 +94,4 @@ static void doShellExec(tgvisd::Main::Main *main,
 }
 
 
-} /* namespace tgvisd::Modules::Shell */
+} /* namespace tgvisd::Modules::Enumerate */

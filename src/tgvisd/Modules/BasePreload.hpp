@@ -7,29 +7,27 @@
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
-#ifndef TGVISD__MODULES__BASE_HPP
-#define TGVISD__MODULES__BASE_HPP
+#ifndef TGVISD__MODULES__BASEPRELOAD_HPP
+#define TGVISD__MODULES__BASEPRELOAD_HPP
 
-#include <cassert>
 #include <tgvisd/Main/Main.hpp>
 
 typedef enum module_res_t_ {
-	MRT_STOP,
+	MRT_BREAK,
 	MRT_CONTINUE,
 } module_res_t;
 
 namespace tgvisd::Modules {
 
-class Base
+class BasePreload
 {
 public:
-	Base(void)
+	BasePreload(void)
 	{
 	}
 
-	virtual ~Base(void)
+	virtual ~BasePreload(void)
 	{
-
 	}
 
 	virtual int init(void)
@@ -47,11 +45,8 @@ public:
 	{
 		return MRT_CONTINUE;
 	}
-
-protected:
-	tgvisd::Main::Main *main_ = nullptr;
 };
 
 } /* namespace tgvisd::Modules */
 
-#endif /* #ifndef TGVISD__MODULES__BASE_HPP */
+#endif /* #ifndef TGVISD__MODULES__BASEPRELOAD_HPP */

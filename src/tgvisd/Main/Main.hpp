@@ -13,6 +13,8 @@
 #include <stack>
 #include <atomic>
 #include <tgvisd/Td/Td.hpp>
+#include <tgvisd/common.hpp>
+#include <condition_variable>
 
 namespace tgvisd::Main {
 
@@ -35,6 +37,29 @@ public:
 	Worker *getExtraWorker(void);
 	void putExtraWorker(Worker *worker);
 
+	inline int32_t incRef(void)
+	{
+		assert(stopUpdate_ == false);
+		return atomic_fetch_add(&myRef_, 1);
+	}
+
+
+	inline int32_t decRef(void)
+	{
+		int32_t ret = atomic_fetch_sub(&myRef_, 1);
+		refCond_.notify_all();
+		return ret;
+	}
+
+	inline std::mutex *getRefLock(void)
+	{
+		return &refLock_;
+	}
+
+	inline std::condition_variable *getRefCond(void)
+	{
+		return &refCond_;
+	}
 
 	inline tgvisd::Td::Td *getTd(void)
 	{
@@ -51,24 +76,29 @@ public:
 		return module_;
 	}
 
-	inline size_t incRef(void)
-	{
-		return atomic_fetch_add(&myRef_, 1);
-	}
-
-	inline size_t decRef(void)
-	{
-		return atomic_fetch_sub(&myRef_, 1);
-	}
-
 private:
 	tgvisd::Td::Td td_;
 	uint32_t maxWorkerNum_;
 	uint32_t hardwareConcurrency_;
 	Worker *threads_ = nullptr;
 	Module *module_ = nullptr;
-	HistoryScraper *hs_ = nullptr;
-	std::atomic<size_t> myRef_ = 0;
+
+	/*
+	 * These ref(s) are used for reference
+	 * counting of preloaded module.
+	 *
+	 * Before Main::Main is destroyed, we
+	 * must wait for all preloaded modules
+	 * to be unloaded. These variables are
+	 * the communication channel to them.
+	 *
+	 * Don't destroy Main::Main before
+	 * myRef_ is zero.
+	 */
+	std::atomic<int32_t> myRef_ = 0;
+	std::mutex refLock_;
+	std::condition_variable refCond_;
+
 
 	bool stopUpdate_ = false;
 

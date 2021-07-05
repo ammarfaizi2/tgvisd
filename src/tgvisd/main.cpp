@@ -11,6 +11,7 @@
 #include <cstring>
 #include <tgvisd/Main/Main.hpp>
 
+#include "common.hpp"
 
 #define ACC_PATH_LEN (1024u)
 

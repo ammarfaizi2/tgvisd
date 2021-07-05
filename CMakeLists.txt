@@ -16,21 +16,24 @@ set(TGVISD_TD_SOURCE
 	src/tgvisd/Td/Td.cpp
 )
 
+
 # Modules
 set(TGVISD_MODULES_SOURCE
-  src/tgvisd/Modules/Base.hpp
-  src/tgvisd/Modules/Shell/Shell.cpp
-  src/tgvisd/Modules/Shell/Shell.hpp
+  src/tgvisd/Modules/BaseEnumerate.cpp
+  src/tgvisd/Modules/BaseEnumerate.hpp
+  src/tgvisd/Modules/BasePreload.cpp
+  src/tgvisd/Modules/BasePreload.hpp
+  src/tgvisd/Modules/Enumerate/Shell.cpp
+  src/tgvisd/Modules/Enumerate/Shell.hpp
+  src/tgvisd/Modules/Preload/HistoryScraper.cpp
+  src/tgvisd/Modules/Preload/HistoryScraper.hpp
 )
 
 
 # Main
 set(TGVISD_MAIN_SOURCE
+  src/tgvisd/common.hpp
   src/tgvisd/main.cpp
-  src/tgvisd/Main/History/CRUD.cpp
-  src/tgvisd/Main/History/CRUD.hpp
-  src/tgvisd/Main/HistoryScraper.cpp
-  src/tgvisd/Main/HistoryScraper.hpp
   src/tgvisd/Main/Main.cpp
   src/tgvisd/Main/Main.hpp
   src/tgvisd/Main/Module.cpp

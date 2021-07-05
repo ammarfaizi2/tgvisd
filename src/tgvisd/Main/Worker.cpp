@@ -11,6 +11,8 @@
 #include <chrono>
 #include <iostream>
 
+#include <tgvisd/common.hpp>
+
 #include "Main.hpp"
 #include "Module.hpp"
 #include "Worker.hpp"

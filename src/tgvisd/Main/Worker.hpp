@@ -16,25 +16,6 @@
 #include <cassert>
 #include <condition_variable>
 
-#define __must_hold(MUTEX)
-#define __releases(MUTEX)
-#define __acquires(MUTEX)
-#define likely(EXPR)	__builtin_expect((bool)(EXPR), 1)
-#define unlikely(EXPR)	__builtin_expect((bool)(EXPR), 0)
-
-#define print_nl(...)		\
-do {				\
-	printf(__VA_ARGS__);	\
-	putchar('\n');		\
-} while (0)
-
-#define print_arg(...) print_nl(__VA_ARGS__)
-
-#define pr_debug print_arg
-#define pr_notice print_arg
-#define pr_warn print_arg
-#define pr_err print_arg
-#define pr_error print_arg
 
 namespace tgvisd::Main {
 

@@ -8,6 +8,7 @@
  */
 
 #include <thread>
+#include <chrono>
 #include <cassert>
 #include <iostream>
 
@@ -67,6 +68,7 @@ static void set_interrupt_handler(void)
 
 namespace tgvisd::Main {
 
+using namespace std::chrono_literals;
 
 static void updateNewMessage(Main *main, td_api::updateNewMessage &update);
 
@@ -76,7 +78,10 @@ static uint32_t gModuleRefCount = 0;
 static std::mutex gModuleMutex;
 
 
-Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
+Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
+	__acquires(&gModuleMutex)
+	__releases(&gModuleMutex)
+	:
 	td_(api_id, api_hash, data_path)
 {
 	unsigned int hc;
@@ -139,17 +144,39 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 
 	assert(primaryWorkerStack.size() == hc);
 	assert(extraWorkerStack.size() == (maxWorkerNum_ - hc));
-
-	hs_ = new HistoryScraper(this);
 }
 
 
 Main::~Main(void)
+	__acquires(&gModuleMutex)
+	__releases(&gModuleMutex)
 {
 	stopUpdate_ = true;
 
 	if (threads_)
 		delete[] threads_;
+
+
+	{
+		int32_t n;
+		size_t i = 0;
+		std::unique_lock<std::mutex> lock(refLock_, std::defer_lock);
+		while ((n = atomic_load(&this->myRef_) > 0)) {
+			refCond_.notify_all();
+
+			lock.lock();
+			refCond_.wait_for(lock, 3000ms, [this, &n](void){
+				n = atomic_load(&this->myRef_);
+				return n == 0;
+			});
+			lock.unlock();
+
+			pr_debug("[%03zu] "
+				 "Waiting for preloaded modules to be unloaded..."
+				 " (remaining modules %d)", ++i, n);
+		}
+	}
+
 
 	td_.close();
 
@@ -161,9 +188,6 @@ Main::~Main(void)
 	}
 	module_ = nullptr;
 	gModuleMutex.unlock();
-
-	if (hs_)
-		delete hs_;
 
 #if defined(__linux__)
 	/*
@@ -181,7 +205,6 @@ void Main::run(void)
 	constexpr int timeout = 1;
 
 	td_.loop(timeout);
-	hs_->spawn();
 
 	while (true) {
 
@@ -205,8 +228,8 @@ void Main::run(void)
 
 
 Worker *Main::getPrimaryWorker(void)
-	__acquires(primaryWorkerStackMutex)
-	__releases(primaryWorkerStackMutex)
+	__acquires(&primaryWorkerStackMutex)
+	__releases(&primaryWorkerStackMutex)
 {
 	uint32_t idx;
 	Worker *ret = nullptr;
@@ -222,8 +245,8 @@ Worker *Main::getPrimaryWorker(void)
 
 
 void Main::putPrimaryWorker(Worker *worker)
-	__acquires(primaryWorkerStackMutex)
-	__releases(primaryWorkerStackMutex)
+	__acquires(&primaryWorkerStackMutex)
+	__releases(&primaryWorkerStackMutex)
 {
 	uint32_t idx;
 	primaryWorkerStackMutex.lock();
@@ -237,8 +260,8 @@ void Main::putPrimaryWorker(Worker *worker)
 
 
 Worker *Main::getExtraWorker(void)
-	__acquires(extraWorkerStackMutex)
-	__releases(extraWorkerStackMutex)
+	__acquires(&extraWorkerStackMutex)
+	__releases(&extraWorkerStackMutex)
 {
 	uint32_t idx;
 	Worker *ret = nullptr;
@@ -254,8 +277,8 @@ Worker *Main::getExtraWorker(void)
 
 
 void Main::putExtraWorker(Worker *worker)
-	__acquires(extraWorkerStackMutex)
-	__releases(extraWorkerStackMutex)
+	__acquires(&extraWorkerStackMutex)
+	__releases(&extraWorkerStackMutex)
 {
 	uint32_t idx;
 	extraWorkerStackMutex.lock();
