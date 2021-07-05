@@ -236,9 +236,15 @@ void Worker::internalWorkerPrimary(std::unique_lock<std::mutex> &lock)
 	while (likely(!stopEventLoop_)) {
 
 		/*
-		 * I am a primary worker, I don't
-		 * care about timeout. I am always
-		 * online until the program ends.
+		 * I am a primary worker, I must always
+		 * be online and wait for events even
+		 * though there is no event comming to
+		 * me at the moment (and in the near
+		 * future).
+		 *
+		 * I don't really care about timeout.
+		 *
+		 * I only stop if the `main_` stops me.
 		 */
 		if (!waitForEvent(lock))
 			continue;
@@ -267,12 +273,14 @@ void Worker::internalWorker(std::unique_lock<std::mutex> &lock)
 				continue;
 
 			/*
-			 * I have reached my absolute timeout
-			 * while waiting for events. I am not
-			 * a primary worker neither.
+			 * I am not a primary worker and I have
+			 * reached the maximum timeout while
+			 * waiting for events.
 			 *
-			 * So it is fine for me to exit because
-			 * there is no activity for me.
+			 * Therefore, it is fine for me to exit
+			 * because there is no activity for me
+			 * at the moment (and probably in the
+			 * near future).
 			 *
 			 * Don't worry, I will be resurrected
 			 * when we have a heavy load :)
@@ -280,7 +288,7 @@ void Worker::internalWorker(std::unique_lock<std::mutex> &lock)
 			 * Sayonara!
 			 */
 			stopEventLoop_ = true;
-			printf("Closing thread %u due to inactivity...\n", idx_);
+			pr_debug("Closing worker %u (no activity)...", idx_);
 			break;
 		}
 
