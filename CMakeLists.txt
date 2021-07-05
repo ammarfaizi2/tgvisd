@@ -28,6 +28,8 @@ set(TGVISD_MODULES_SOURCE
 # Main
 set(TGVISD_MAIN_SOURCE
   src/tgvisd/main.cpp
+  src/tgvisd/Main/HistoryScraper.cpp
+  src/tgvisd/Main/HistoryScraper.hpp
   src/tgvisd/Main/Main.cpp
   src/tgvisd/Main/Main.hpp
   src/tgvisd/Main/Module.cpp
@@ -57,13 +59,14 @@ target_compile_options(tgvisd-td PRIVATE
 # Build the main binary
 add_executable(tgvisd ${TGVISD_MAIN_SOURCE})
 set_property(TARGET tgvisd PROPERTY CXX_STANDARD 20)
-target_link_libraries(tgvisd tgvisd-td pthread curl)
+target_link_libraries(tgvisd asan tgvisd-td pthread curl)
 target_include_directories(tgvisd PRIVATE td/include)
 target_compile_options(tgvisd PRIVATE
   -ggdb3
   -Wall
   -Wextra
   -Wpedantic
+  -fsanitize=address
   -Wno-unused-parameter
   -fno-omit-frame-pointer
   -fstack-protector-strong

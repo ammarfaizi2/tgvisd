@@ -15,6 +15,10 @@
 #include "Module.hpp"
 #include "Worker.hpp"
 
+#if defined(__linux__)
+#  include <pthread.h>
+#endif
+
 namespace tgvisd::Main {
 
 
@@ -117,6 +121,37 @@ void Worker::doSpawn(void)
 	pr_debug("Spawning thread %u...", idx_);
 	thread_ = new std::thread([this](void){
 
+		/*
+		 * Hey! Be careful!
+		 *
+		 * this->thread_ may be a nullptr at this point.
+		 *
+		 * When the constructor of std::thread is called,
+		 * we are spawned. However, the object may haven't
+		 * been assigned to this->thread_.
+		 *
+		 * Don't race with the parent thread. Let's wait!
+		 */
+		{
+			std::unique_lock<std::mutex> lock(*this->updateMutex_);
+			while (this->thread_ == nullptr) {
+				this->updateCond_->wait(lock, [this](void){
+					return this->thread_ != nullptr;
+				});
+			}
+		}
+
+
+#if defined(__linux__)
+
+		{
+			char trname[32];
+			pthread_t pt = this->thread_->native_handle();
+			snprintf(trname, sizeof(trname), "wrk-%04u", this->idx_);
+			pthread_setname_np(pt, trname);
+		}
+#endif
+
 		this->stopEventLoop_ = false;
 		this->isOnline_ = true;
 		this->updateCond_->notify_one();
@@ -129,6 +164,13 @@ void Worker::doSpawn(void)
 		 */
 		assert(this->stopEventLoop_ == true);
 	});
+
+
+	/*
+	 * In any way, this->thread_ cannot be nullptr
+	 * at this point!
+	 */
+	updateCond_->notify_one();
 
 
 	/*
@@ -175,7 +217,7 @@ void Worker::handleUpdate(std::unique_lock<std::mutex> &lock)
 bool Worker::waitForEvent(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
-	return updateCond_->wait_for(lock, 1000ms, [this](void){
+	return updateCond_->wait_for(lock, 10000ms, [this](void){
 		return this->hasUpdate_ || this->stopEventLoop_;
 	});
 }
@@ -248,4 +290,3 @@ void Worker::internalWorker(std::unique_lock<std::mutex> &lock)
 
 
 } /* namespace tgvisd::Main */
-

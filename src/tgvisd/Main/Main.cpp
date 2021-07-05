@@ -11,6 +11,7 @@
 #include <cassert>
 #include <iostream>
 
+#include "HistoryScraper.hpp"
 #include "Main.hpp"
 #include "Module.hpp"
 #include "Worker.hpp"
@@ -136,6 +137,8 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 
 	assert(primaryWorkerStack.size() == hc);
 	assert(extraWorkerStack.size() == (maxWorkerNum_ - hc));
+
+	hs_ = new HistoryScraper(this);
 }
 
 
@@ -157,6 +160,9 @@ Main::~Main(void)
 	module_ = nullptr;
 	gModuleMutex.unlock();
 
+	if (hs_)
+		delete hs_;
+
 #if defined(__linux__)
 	/*
 	 * Sync memory to disk to ensure
@@ -171,6 +177,10 @@ Main::~Main(void)
 void Main::run(void)
 {
 	constexpr int timeout = 1;
+
+	td_.loop(timeout);
+	hs_->spawn();
+
 	while (true) {
 
 #if defined(__linux__)

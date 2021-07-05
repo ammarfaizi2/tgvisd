@@ -16,6 +16,8 @@
 
 namespace tgvisd::Main {
 
+class HistoryScraper;
+
 class Module;
 
 class Worker;
@@ -65,6 +67,7 @@ private:
 	uint32_t hardwareConcurrency_;
 	Worker *threads_ = nullptr;
 	Module *module_ = nullptr;
+	HistoryScraper *hs_ = nullptr;
 	std::atomic<size_t> myRef_ = 0;
 
 	bool stopUpdate_ = false;
