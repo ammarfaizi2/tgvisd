@@ -12,12 +12,15 @@
 
 #include <thread>
 #include <tgvisd/Td/Td.hpp>
+#include <tgvisd/Main/History/CRUD.hpp>
 
 #define __must_hold(MUTEX)
 #define __releases(MUTEX)
 #define __acquires(MUTEX)
 #define likely(EXPR)	__builtin_expect((bool)(EXPR), 1)
 #define unlikely(EXPR)	__builtin_expect((bool)(EXPR), 0)
+
+using tgvisd::Main::History::CRUD;
 
 namespace tgvisd::Main {
 
@@ -35,6 +38,7 @@ private:
 	Main *main_= nullptr;
 	std::thread *thread_ = nullptr;
 	bool stopEventLoop_ = false;
+	CRUD *crud_ = nullptr;
 
 	void run(void);
 	void gatherHistory(void);

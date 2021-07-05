@@ -5,7 +5,6 @@ project(TeaBot VERSION 8.3 LANGUAGES CXX)
 
 find_package(Td 1.7.0 REQUIRED)
 
-
 include_directories(src)
 include_directories(src/ext)
 
@@ -28,6 +27,8 @@ set(TGVISD_MODULES_SOURCE
 # Main
 set(TGVISD_MAIN_SOURCE
   src/tgvisd/main.cpp
+  src/tgvisd/Main/History/CRUD.cpp
+  src/tgvisd/Main/History/CRUD.hpp
   src/tgvisd/Main/HistoryScraper.cpp
   src/tgvisd/Main/HistoryScraper.hpp
   src/tgvisd/Main/Main.cpp
@@ -55,11 +56,13 @@ target_compile_options(tgvisd-td PRIVATE
   -fstack-protector-strong
 )
 
+link_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/build)
+include_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/include)
 
 # Build the main binary
 add_executable(tgvisd ${TGVISD_MAIN_SOURCE})
 set_property(TARGET tgvisd PROPERTY CXX_STANDARD 20)
-target_link_libraries(tgvisd asan tgvisd-td pthread curl)
+target_link_libraries(tgvisd asan tgvisd-td pthread curl mysqlcppconn8)
 target_include_directories(tgvisd PRIVATE td/include)
 target_compile_options(tgvisd PRIVATE
   -ggdb3

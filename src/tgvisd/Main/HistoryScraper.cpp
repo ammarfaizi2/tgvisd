@@ -18,6 +18,7 @@ namespace tgvisd::Main {
 HistoryScraper::HistoryScraper(Main *main):
 	main_(main)
 {
+	crud_ = new CRUD("127.0.0.1", 3306, "root", "password");
 }
 
 
@@ -28,6 +29,9 @@ HistoryScraper::~HistoryScraper(void)
 		thread_->join();
 		delete thread_;
 	}
+
+	if (crud_)
+		delete crud_;
 }
 
 
@@ -48,7 +52,8 @@ void HistoryScraper::run(void)
 	pthread_setname_np(pt, "history-scraper");
 #endif
 	while (likely(!stopEventLoop_)) {
-		gatherHistory();
+		crud_->insertMessage();
+		// gatherHistory();
 		sleep(10);
 	}
 }

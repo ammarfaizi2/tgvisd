@@ -121,6 +121,9 @@ void Worker::doSpawn(void)
 	pr_debug("Spawning thread %u...", idx_);
 	thread_ = new std::thread([this](void){
 
+		this->stopEventLoop_ = false;
+		this->isOnline_ = true;
+
 		/*
 		 * Hey! Be careful!
 		 *
@@ -152,9 +155,13 @@ void Worker::doSpawn(void)
 		}
 #endif
 
-		this->stopEventLoop_ = false;
-		this->isOnline_ = true;
+
+		/*
+		 * I am ready, notify the calling thread!
+		 */
 		this->updateCond_->notify_one();
+
+
 		this->runWorker();
 		assert(isOnline_ == false);
 
@@ -174,9 +181,9 @@ void Worker::doSpawn(void)
 
 
 	/*
-	 * Wait for thread to be ready.
+	 * Wait for the thread to be ready.
 	 */
-	while (!this->isOnline_) {
+	while (!isOnline_) {
 		updateCond_->wait(lock, [this](void){
 			return this->isOnline_;
 		});

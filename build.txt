@@ -10,3 +10,9 @@ mkdir build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release -DTd_DIR=$(pwd)/../td/lib/cmake/Td .. cmake/Td ..
 cmake --build .
+
+
+
+# Debug build
+cmake -DCMAKE_BUILD_TYPE=Debug -DTd_DIR=$(pwd)/../td/lib/cmake/Td .. cmake/Td ..
+cmake --build .

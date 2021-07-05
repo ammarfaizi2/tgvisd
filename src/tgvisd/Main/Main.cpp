@@ -120,8 +120,10 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	pr_debug("Max number of workers is %u", maxWorkerNum_);
 
 	for (size_t i = 0; i < maxWorkerNum_; i++) {
-		threads_[i].__construct(this, i, i < hc);
-		if (i < hc)
+		bool isPrimaryWorker = (i < hc);
+
+		threads_[i].__construct(this, i, isPrimaryWorker);
+		if (isPrimaryWorker)
 			threads_[i].spawn();
 	}
 
@@ -196,7 +198,8 @@ void Main::run(void)
 			break;
 		}
 #endif
-		td_.loop(timeout);
+		// td_.loop(timeout);
+		sleep(1);
 	}
 }
 
