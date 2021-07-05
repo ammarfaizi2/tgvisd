@@ -78,10 +78,33 @@ static uint32_t gModuleRefCount = 0;
 static std::mutex gModuleMutex;
 
 
-Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
+void Main::toggleGlobalModule(int sw)
 	__acquires(&gModuleMutex)
 	__releases(&gModuleMutex)
-	:
+{
+	gModuleMutex.lock();
+	if (sw) {
+		/* Load the global module. */
+		if (!gModule) {
+			assert(gModuleRefCount == 0);
+			gModule = new Module;
+		}
+		gModuleRefCount++;
+		module_ = gModule;
+	} else {
+		/* Unload the global module. */
+		assert(gModule != nullptr);
+		if (--gModuleRefCount == 0) {
+			delete gModule;
+			gModule = nullptr;
+		}
+		module_ = nullptr;
+	}
+	gModuleMutex.unlock();
+}
+
+
+Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	td_(api_id, api_hash, data_path)
 {
 	unsigned int hc;
@@ -94,16 +117,7 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
 		updateNewMessage(this, update);
 	};
 
-
-	gModuleMutex.lock();
-	if (!gModule) {
-		assert(gModuleRefCount == 0);
-		gModule = new Module;
-	}
-	gModuleRefCount++;
-	module_ = gModule;
-	gModuleMutex.unlock();
-
+	toggleGlobalModule(1);
 
 	/*
 	 * Initialize workers.
@@ -119,7 +133,7 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
 
 	maxWorkerNum_ = hc * 100;
 	hardwareConcurrency_ = hc;
-	threads_ = new Worker[maxWorkerNum_];
+	workers_ = new Worker[maxWorkerNum_];
 
 	pr_debug("Hardware concurrency number is %u", hc);
 	pr_debug("Max number of workers is %u", maxWorkerNum_);
@@ -127,19 +141,19 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
 	for (size_t i = 0; i < maxWorkerNum_; i++) {
 		bool isPrimaryWorker = (i < hc);
 
-		threads_[i].__construct(this, i, isPrimaryWorker);
+		workers_[i].__construct(this, i, isPrimaryWorker);
 		if (isPrimaryWorker)
-			threads_[i].spawn();
+			workers_[i].spawn();
 	}
 
 	for (size_t i = hc; i--;) {
-		assert(threads_[i].getIndex() == i);
-		putPrimaryWorker(&threads_[i]);
+		assert(workers_[i].getIndex() == i);
+		putPrimaryWorker(&workers_[i]);
 	}
 
 	for (size_t i = maxWorkerNum_; i-- > hc;) {
-		assert(threads_[i].getIndex() == i);
-		putExtraWorker(&threads_[i]);
+		assert(workers_[i].getIndex() == i);
+		putExtraWorker(&workers_[i]);
 	}
 
 	assert(primaryWorkerStack.size() == hc);
@@ -147,47 +161,40 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path)
 }
 
 
+void Main::waitForPreloadedModulesToBeUnloaded(void)
+{
+	int32_t n;
+	size_t i = 0;
+	std::unique_lock<std::mutex> lock(refLock_, std::defer_lock);
+
+	while ((n = atomic_load(&this->myRef_)) > 0) {
+		refCond_.notify_all();
+
+		lock.lock();
+		refCond_.wait_for(lock, 3000ms, [this, &n](void){
+			n = atomic_load(&this->myRef_);
+			return n == 0;
+		});
+		lock.unlock();
+
+		pr_debug("[%03zu] "
+			 "Waiting for preloaded modules to be unloaded..."
+			 " (remaining modules %d)", ++i, n);
+	}
+}
+
+
 Main::~Main(void)
-	__acquires(&gModuleMutex)
-	__releases(&gModuleMutex)
 {
 	stopUpdate_ = true;
 
-	if (threads_)
-		delete[] threads_;
+	if (workers_)
+		delete[] workers_;
 
-
-	{
-		int32_t n;
-		size_t i = 0;
-		std::unique_lock<std::mutex> lock(refLock_, std::defer_lock);
-		while ((n = atomic_load(&this->myRef_) > 0)) {
-			refCond_.notify_all();
-
-			lock.lock();
-			refCond_.wait_for(lock, 3000ms, [this, &n](void){
-				n = atomic_load(&this->myRef_);
-				return n == 0;
-			});
-			lock.unlock();
-
-			pr_debug("[%03zu] "
-				 "Waiting for preloaded modules to be unloaded..."
-				 " (remaining modules %d)", ++i, n);
-		}
-	}
-
-
+	waitForPreloadedModulesToBeUnloaded();
+	toggleGlobalModule(0);
 	td_.close();
 
-	gModuleMutex.lock();
-	assert(gModule != nullptr);
-	if (--gModuleRefCount == 0) {
-		delete gModule;
-		gModule = nullptr;
-	}
-	module_ = nullptr;
-	gModuleMutex.unlock();
 
 #if defined(__linux__)
 	/*
@@ -236,7 +243,7 @@ Worker *Main::getPrimaryWorker(void)
 	primaryWorkerStackMutex.lock();
 	if (likely(!primaryWorkerStack.empty())) {
 		idx = primaryWorkerStack.top();
-		ret = &threads_[idx];
+		ret = &workers_[idx];
 		primaryWorkerStack.pop();
 	}
 	primaryWorkerStackMutex.unlock();
@@ -268,7 +275,7 @@ Worker *Main::getExtraWorker(void)
 	extraWorkerStackMutex.lock();
 	if (likely(!extraWorkerStack.empty())) {
 		idx = extraWorkerStack.top();
-		ret = &threads_[idx];
+		ret = &workers_[idx];
 		extraWorkerStack.pop();
 	}
 	extraWorkerStackMutex.unlock();

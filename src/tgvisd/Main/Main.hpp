@@ -80,7 +80,7 @@ private:
 	tgvisd::Td::Td td_;
 	uint32_t maxWorkerNum_;
 	uint32_t hardwareConcurrency_;
-	Worker *threads_ = nullptr;
+	Worker *workers_ = nullptr;
 	Module *module_ = nullptr;
 
 	/*
@@ -109,6 +109,8 @@ private:
 	std::stack<uint32_t> extraWorkerStack;
 
 	void spawnThreads(void);
+	void toggleGlobalModule(int sw);
+	void waitForPreloadedModulesToBeUnloaded(void);
 };
 
 } /* namespace tgvisd::Main */
