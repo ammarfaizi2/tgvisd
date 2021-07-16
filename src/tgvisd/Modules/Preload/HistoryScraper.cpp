@@ -12,22 +12,49 @@
 #endif
 
 #include <cstdio>
+#include <mutex>
+#include <chrono>
 #include <iostream>
+#include <condition_variable>
+
 #include "HistoryScraper.hpp"
 
 namespace tgvisd::Modules::Preload {
 
+using namespace std::chrono_literals;
 
 HistoryScraper::HistoryScraper(void)
 {
 }
 
+class Worker
+{
+public:
+	Worker(tgvisd::Main::Main *main);
+	void run(void);
+private:
+	tgvisd::Td::Td *td_ = nullptr;
+	tgvisd::Main::Main *main_ = nullptr;
+
+	void gatherMsg(void);
+	void gatherMsgByChatId(int64_t chat_id);
+	td_api::object_ptr<td_api::chats> getChats(void);
+	td_api::object_ptr<td_api::messages> getChatHistory(int64_t chat_id);
+
+	inline bool stopUpdate(void)
+	{
+		return main_->stopUpdate();
+	}
+};
+
 
 mbp_ret_t HistoryScraper::initPreload(tgvisd::Main::Main *main)
 {
 	main->incRef();
-	std::thread worker = std::thread([this, main](void){
-		this->worker(main);
+	std::thread worker = std::thread([main](void){
+		Worker *wrk = new Worker(main);
+		wrk->run();
+		delete wrk;
 		main->decRef();
 	});
 
@@ -44,39 +71,99 @@ mbp_ret_t HistoryScraper::initPreload(tgvisd::Main::Main *main)
 }
 
 
-void HistoryScraper::worker(tgvisd::Main::Main *main)
+Worker::Worker(tgvisd::Main::Main *main):
+	main_(main)
 {
+	td_ = main->getTd();
+	assert(td_);
+}
+
+
+void Worker::run(void)
+{
+	tgvisd::Main::Main *main = main_;
+
 	while (likely(!main->stopUpdate())) {
-		gatherData(main);
-		sleep(3);
+		gatherMsg();
+		sleep(1);
 	}
 }
 
 
-void HistoryScraper::gatherData(tgvisd::Main::Main *main)
+td_api::object_ptr<td_api::chats> Worker::getChats(void)
 {
-	std::mutex lk;
-	int64_t chat_id = -1001226735471;
-	int64_t from_message_id = 1;
-	int32_t offset = -99;
-	int32_t limit = 100;
-	bool only_local = false;
-	tgvisd::Td::Td *td = main->getTd();
-	td_api::object_ptr<td_api::messages> pMsg;
+	std::mutex mut;
+	bool finished = false;
+	std::condition_variable cond;
+	std::unique_lock<std::mutex> lock(mut, std::defer_lock);
+	td_api::object_ptr<td_api::chats> chats;
 
-
-	printf("Getting chat history...\n");
-	auto req = td_api::make_object<td_api::getChatHistory>(
-			chat_id, from_message_id, offset, limit, only_local);
-
-	lk.lock();
-	td->send_query(std::move(req), [this, &lk, &pMsg](auto up){
-		td_api::object_ptr<td_api::Object> &obj = up;
-
+	auto callback = [&chats, &cond, &finished](
+		td_api::object_ptr<td_api::Object> obj
+	) {
 		if (obj->get_id() == td_api::error::ID) {
 			auto err = td::move_tl_object_as<td_api::error>(obj);
 			std::cout
-				<< "Error on handleMessageVector: "
+				<< "Error on getChats: "
+				<< err->message_
+				<< std::endl;
+			goto out;
+		}
+
+		if (obj->get_id() != td_api::chats::ID) {
+			std::cout
+				<< "Invalid object returned on getChats"
+				<< std::endl;
+			goto out;
+		}
+
+		chats = td::move_tl_object_as<td_api::chats>(obj);
+	out:
+		finished = true;
+		cond.notify_one();
+	};
+
+
+	td_->send_query(
+		td_api::make_object<td_api::getChats>(
+			nullptr,
+			std::numeric_limits<std::int64_t>::max(),
+			0,
+			100
+		),
+		callback
+	);
+
+
+	lock.lock();
+	while (!(this->stopUpdate() || finished)) {
+		cond.wait_for(lock, 2000ms, [this, &finished](void){
+			return this->stopUpdate() || finished;
+		});
+	}
+
+	if (unlikely(this->stopUpdate()))
+		chats = nullptr;
+
+	return chats;
+}
+
+
+td_api::object_ptr<td_api::messages> Worker::getChatHistory(int64_t chat_id)
+{
+	std::mutex mut;
+	bool finished = false;
+	std::condition_variable cond;
+	std::unique_lock<std::mutex> lock(mut, std::defer_lock);
+	td_api::object_ptr<td_api::messages> msgs;
+
+	auto callback = [&msgs, &cond, &finished](
+		td_api::object_ptr<td_api::Object> obj
+	) {
+		if (obj->get_id() == td_api::error::ID) {
+			auto err = td::move_tl_object_as<td_api::error>(obj);
+			std::cout
+				<< "Error on getChatHistory: "
 				<< err->message_
 				<< std::endl;
 			goto out;
@@ -84,50 +171,93 @@ void HistoryScraper::gatherData(tgvisd::Main::Main *main)
 
 		if (obj->get_id() != td_api::messages::ID) {
 			std::cout
-				<< "Invalid object returned on gatherData"
+				<< "Invalid object returned on getChatHistory"
 				<< std::endl;
 			goto out;
 		}
 
-		pMsg = td::move_tl_object_as<td_api::messages>(obj);
+		msgs = td::move_tl_object_as<td_api::messages>(obj);
 	out:
-		std::cout << "Unlocked!" << std::endl;
-		lk.unlock();
-	});
-	lk.lock();
-	handleMessageVector(pMsg);
-	lk.unlock();
+		finished = true;
+		cond.notify_one();
+	};
+
+	int64_t from_message_id = 0;
+	int32_t offset = 0;
+	int32_t limit = 100;
+	bool only_local = false;
+	td_->send_query(
+		td_api::make_object<td_api::getChatHistory>(
+			chat_id,
+			from_message_id,
+			offset,
+			limit,
+			only_local
+		),
+		callback
+	);
+
+
+	lock.lock();
+	while (!(this->stopUpdate() || finished)) {
+		cond.wait_for(lock, 2000ms, [this, &finished](void){
+			return this->stopUpdate() || finished;
+		});
+	}
+
+	return msgs;
 }
 
 
-void HistoryScraper::handleMessageVector(td_api::object_ptr<td_api::messages> &pMsg)
+void Worker::gatherMsg(void)
 {
-	if (!pMsg) {
-		printf("pMsg is NULL\n");
+	td_api::object_ptr<td_api::chats> chats = getChats();
+
+	if (unlikely(this->stopUpdate()))
+		return;
+
+	if (!chats) {
+		std::cout << "Chat is null on gatherMsg" << std::endl;
 		return;
 	}
 
-	auto &messages = pMsg->messages_;
-	int32_t count = pMsg->total_count_;
-
-	printf("count = %d\n", count);
-	for (int32_t i = 0; i < count; i++) {
-		auto &message = messages[i];
-		if (!message)
+	for (auto chat_id: chats->chat_ids_) {
+		if (chat_id > 0)
 			continue;
 
-		auto &content = message->content_;
-		if (!content)
+		gatherMsgByChatId(chat_id);
+	}
+
+	sleep(1);
+}
+
+
+void Worker::gatherMsgByChatId(int64_t chat_id)
+{
+	td_api::object_ptr<td_api::messages> msgs = getChatHistory(chat_id);
+
+	if (unlikely(this->stopUpdate()))
+		return;
+
+	if (!msgs) {
+		std::cout
+			<< "Messages is null on gatherMsgByChatId"
+			<< std::endl;
+		return;
+	}
+
+	for (auto &msg: msgs->messages_) {
+		if (unlikely(!msg))
 			continue;
 
+		auto &content = msg->content_;
 		if (content->get_id() != td_api::messageText::ID)
 			continue;
 
 		std::string &text = static_cast<td_api::messageText &>(*content).text_->text_;
-		printf("%ld = %s\n", (message->id_ >> 20u), text.c_str());
+		printf("%ld = %s\n", (msg->id_ >> 20u), text.c_str());
 	}
 }
-
 
 
 } /* namespace tgvisd::Modules::Preload */
