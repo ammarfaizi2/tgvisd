@@ -49,7 +49,11 @@ mbe_ret_t Shell::handleUpdate(tgvisd::Main::Main *main,
 {
 	auto &update_ = update;
 	auto &message = update_.message_;
-	auto &content = *(message->content_);
+
+	if (!message->content_)
+		return MBE_CONTINUE;
+
+	auto &content = *message->content_;
 
 	if (message->content_->get_id() != td_api::messageText::ID)
 		return MBE_CONTINUE;

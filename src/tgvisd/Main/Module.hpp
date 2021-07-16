@@ -24,10 +24,12 @@ class Module
 public:
 	Module(void);
 	~Module(void);
-	void enumerate(Main *main, td_api::updateNewMessage &update_);
+	void initPreloadModules(Main *main);
+	void dispatchEnumerate(Main *main, td_api::updateNewMessage &update_);
+
 private:
-	void initModule(void);
-	void shutdownModule(void);
+	void shutdownPreloadModules(void);
+	void shutdownEnumerateModules(void);
 
 
 #define TAKE_MODULE_TABLE_DEFINITION

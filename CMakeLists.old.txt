@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
 project(TeaBot VERSION 8.3 LANGUAGES CXX)
 
-find_package(Td 1.7.0 REQUIRED)
+find_package(Td 1.7.5 REQUIRED)
 
 include_directories(src)
 include_directories(src/ext)

@@ -88,6 +88,8 @@ void Main::toggleGlobalModule(int sw)
 		if (!gModule) {
 			assert(gModuleRefCount == 0);
 			gModule = new Module;
+		} else {
+			assert(gModuleRefCount > 0);
 		}
 		gModuleRefCount++;
 		module_ = gModule;
@@ -104,20 +106,9 @@ void Main::toggleGlobalModule(int sw)
 }
 
 
-Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
-	td_(api_id, api_hash, data_path)
+void Main::spawnThreads(void)
 {
 	unsigned int hc;
-
-#if defined(__linux__)
-	set_interrupt_handler();
-#endif
-
-	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
-		updateNewMessage(this, update);
-	};
-
-	toggleGlobalModule(1);
 
 	/*
 	 * Initialize workers.
@@ -140,7 +131,6 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 
 	for (size_t i = 0; i < maxWorkerNum_; i++) {
 		bool isPrimaryWorker = (i < hc);
-
 		workers_[i].__construct(this, i, isPrimaryWorker);
 		if (isPrimaryWorker)
 			workers_[i].spawn();
@@ -161,11 +151,31 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 }
 
 
+Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
+	td_(api_id, api_hash, data_path)
+{
+
+#if defined(__linux__)
+	set_interrupt_handler();
+#endif
+
+	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
+		updateNewMessage(this, update);
+	};
+
+	toggleGlobalModule(1);
+	spawnThreads();
+	module_->initPreloadModules(this);
+}
+
+
 void Main::waitForPreloadedModulesToBeUnloaded(void)
 {
 	int32_t n;
 	size_t i = 0;
 	std::unique_lock<std::mutex> lock(refLock_, std::defer_lock);
+
+	assert(stopUpdate_ == true);
 
 	while ((n = atomic_load(&this->myRef_)) > 0) {
 		refCond_.notify_all();
@@ -228,8 +238,8 @@ void Main::run(void)
 			break;
 		}
 #endif
-		// td_.loop(timeout);
-		sleep(1);
+		td_.loop(timeout);
+		// sleep(1);
 	}
 }
 

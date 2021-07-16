@@ -216,8 +216,10 @@ void Worker::runWorker(void)
 void Worker::handleUpdate(std::unique_lock<std::mutex> &lock)
 	__must_hold(updateMutex_)
 {
+	auto module = main_->getModule();
 	pr_debug("Proessing event on thread %u...", idx_);
-	main_->getModule()->enumerate(main_, update_);
+	assert(module != nullptr);
+	module->dispatchEnumerate(main_, update_);
 	pr_debug("Thread %u has finished its job!", idx_);
 	hasUpdate_ = false;
 }

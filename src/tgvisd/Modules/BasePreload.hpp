@@ -12,10 +12,10 @@
 
 #include <tgvisd/Main/Main.hpp>
 
-typedef enum module_res_t_ {
-	MRT_BREAK,
-	MRT_CONTINUE,
-} module_res_t;
+typedef enum mbp_ret_t_ {
+	MBP_BREAK,
+	MBP_CONTINUE
+} mbp_ret_t;
 
 namespace tgvisd::Modules {
 
@@ -30,20 +30,9 @@ public:
 	{
 	}
 
-	virtual int init(void)
+	virtual mbp_ret_t initPreload(tgvisd::Main::Main *main)
 	{
-		return 0;
-	}
-
-	virtual int shutdown(void)
-	{
-		return 0;
-	}
-
-	virtual module_res_t handleUpdate(tgvisd::Main::Main *main,
-					  td_api::updateNewMessage &update)
-	{
-		return MRT_CONTINUE;
+		return MBP_CONTINUE;
 	}
 };
 

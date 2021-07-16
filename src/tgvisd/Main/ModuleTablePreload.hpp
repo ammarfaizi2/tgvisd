@@ -10,13 +10,14 @@
 #ifndef TAKE_MODULE_TABLE_DEFINITION
 
 #include <tgvisd/Modules/BasePreload.hpp>
+#include <tgvisd/Modules/Preload/HistoryScraper.hpp>
 
 using tgvisd::Modules::BasePreload;
 
 #else /* #ifdef TAKE_MODULE_TABLE_DEFINITION */
 
 BasePreload *moduleTablePreload_[2] = {
-	nullptr,
+	new tgvisd::Modules::Preload::HistoryScraper(),
 	nullptr
 };
 
