@@ -131,17 +131,17 @@ Worker::Worker(tgvisd::Main::Main *main):
 }
 
 
-// td_api::object_ptr<td_api::chats> Worker::getChats(void)
-// {
-// 	return td_->send_query_sync<td_api::getChats, td_api::chats>(
-// 		td_api::make_object<td_api::getChats>(
-// 			nullptr,
-// 			std::numeric_limits<std::int64_t>::max(),
-// 			0,
-// 			100
-// 		)
-// 	);
-// }
+td_api::object_ptr<td_api::chats> Worker::getChats(void)
+{
+	return td_->send_query_sync<td_api::getChats, td_api::chats>(
+		td_api::make_object<td_api::getChats>(
+			nullptr,
+			std::numeric_limits<std::int64_t>::max(),
+			0,
+			100
+		)
+	);
+}
 
 
 // td_api::object_ptr<td_api::messages> Worker::getChatHistory(int64_t chat_id)
@@ -300,6 +300,8 @@ void Worker::run(void)
 	
 
 	try {
+		sleep(2);
+		getChats();
 		sleep(2);
 		db_ = createDB();
 		gatherChatEventLog(-1001483770714); // GNU/Weeb

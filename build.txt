@@ -1,18 +1,4 @@
 
-cd /home/ammarfaizi2/project/now/td
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX:PATH=../teabot/td ..
-cmake --build . --target install
 
-cd teabot
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DTd_DIR=$(pwd)/../td/lib/cmake/Td .. cmake/Td ..
-cmake --build .
-
-
-
-# Debug build
-cmake -DCMAKE_BUILD_TYPE=Debug -DTd_DIR=$(pwd)/../td/lib/cmake/Td .. cmake/Td ..
-cmake --build .
+cmake -DCMAKE_BUILD_TYPE=Release -DTd_DIR=$(pwd)/../td/lib/cmake/Td ..
+cmake --build . --target install --parallel 2 -j4
