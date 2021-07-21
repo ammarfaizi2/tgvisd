@@ -320,7 +320,7 @@ unsigned char *sha1_file(const char *filename, unsigned char *digest)
 {
 	size_t n;
 	FILE *handle;
-	char buffer[1024];
+	unsigned char buffer[1024];
 	PHP_SHA1_CTX context;
 
 	handle = fopen(filename, "rb");
@@ -332,4 +332,5 @@ unsigned char *sha1_file(const char *filename, unsigned char *digest)
 		PHP_SHA1Update(&context, buffer, n);
 	}
 	PHP_SHA1Final(digest, &context);
+	return digest;
 }

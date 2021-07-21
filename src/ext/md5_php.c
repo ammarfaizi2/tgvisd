@@ -315,7 +315,7 @@ unsigned char *md5_file(const char *filename, unsigned char *digest)
 {
 	size_t n;
 	FILE *handle;
-	char buffer[1024];
+	unsigned char buffer[1024];
 	PHP_MD5_CTX context;
 
 	handle = fopen(filename, "rb");
@@ -327,4 +327,5 @@ unsigned char *md5_file(const char *filename, unsigned char *digest)
 		PHP_MD5Update(&context, buffer, n);
 	}
 	PHP_MD5Final(digest, &context);
+	return digest;
 }

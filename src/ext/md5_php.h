@@ -18,6 +18,10 @@
 #ifndef MD5_H
 #define MD5_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <string.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -49,5 +53,9 @@ void PHP_MD5Update(PHP_MD5_CTX *ctx, const void *data, size_t size);
 void PHP_MD5Final(unsigned char *result, PHP_MD5_CTX *ctx);
 
 unsigned char *md5_file(const char *filename, unsigned char *digest);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif

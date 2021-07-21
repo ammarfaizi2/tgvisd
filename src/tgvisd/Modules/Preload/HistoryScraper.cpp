@@ -11,6 +11,7 @@
 #  include <pthread.h>
 #endif
 
+#include <stack>
 #include <cstdio>
 #include <mutex>
 #include <chrono>
@@ -20,6 +21,11 @@
 #include <atomic>
 #include <unordered_map>
 #include <condition_variable>
+
+#include <errno.h>
+#include <cstring>
+#include <md5_php.h>
+#include <sha1_php.h>
 
 #include <tgvisd/DB.hpp>
 
@@ -72,6 +78,7 @@ public:
 	int64_t resolveGroup(td_api::chat &chat, td_api::chat **chat_p);
 	uint64_t resolveMessage(td_api::message &msg, uint64_t db_user_id,
 				uint64_t db_group_id);
+	uint64_t resolveFile(tgvisd::DB *db, td_api::file &file);
 	uint64_t lastInsertId(void);
 private:
 	tgvisd::DB *db_ = nullptr;
@@ -258,6 +265,13 @@ td_api::object_ptr<td_api::file> Worker::downloadFile(int32_t file_id)
 
 const char *dbhost, *dbuser, *dbpass, *dbname;
 
+static inline tgvisd::DB *createDB(void)
+{
+	tgvisd::DB *db_ = new tgvisd::DB(dbhost, 0, dbuser, dbpass, dbname);
+	db_->connect();
+	return db_;
+}
+
 void Worker::run(void)
 {
 	dbhost = getenv("DB_HOST");
@@ -284,8 +298,7 @@ void Worker::run(void)
 
 	try {
 		sleep(2);
-		db_ = new tgvisd::DB(dbhost, 0, dbuser, dbpass, dbname);
-		db_->connect();
+		db_ = createDB();
 		// gatherChatEventLog(-1001483770714); // GNU/Weeb
 		gatherChatEventLog(-1001226735471); // Private Cloud
 	} catch (std::string &err) {
@@ -416,7 +429,7 @@ static char *getDateNow(char *buffer, size_t len)
 }
 
 
-uint64_t Worker::lastInsertId(void)
+static uint64_t lastInsertId_static(tgvisd::DB *db_)
 {
 	uint64_t ret = 0;
 	auto st = db_->prepare("SELECT LAST_INSERT_ID();");
@@ -425,6 +438,12 @@ uint64_t Worker::lastInsertId(void)
 		IS_OK(mysqlx_get_uint(row, 0, &ret), st->getStmt());
 	}
 	return ret;
+}
+
+
+uint64_t Worker::lastInsertId(void)
+{
+	return lastInsertId_static(db_);
 }
 
 
@@ -611,11 +630,11 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	}
 
 
+	printf("Saving %s\n", msg_type);
 	char dateBuf[64];
 	const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
-
 	auto st = db_->prepare(query);
-	st->bind(
+	st->execute(
 		PARAM_UINT(db_group_id),
 		PARAM_UINT(db_user_id),
 		PARAM_UINT(msg.id_ >> 20u),
@@ -624,7 +643,6 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 		PARAM_STRING(dateNow),
 		PARAM_END
 	);
-	st->execute();
 
 	ret = lastInsertId();
 	switch (msg.content_->get_id()) {
@@ -673,15 +691,150 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 	st->execute();
 }
 
+
+static const char *get_filename_ext(const char *filename)
+{
+	const char *dot = strrchr(filename, '.');
+	if (!dot || dot == filename)
+		return "";
+	return dot + 1;
+}
+
+
+uint64_t Worker::resolveFile(tgvisd::DB *db, td_api::file &file)
+{
+	unsigned char md5_buf[16], sha1_buf[20];
+	uint64_t ret = 0;
+	pr_debug("Downloading file...");
+	auto f = downloadFile(file.id_);
+	if (!f) {
+		pr_debug("Download fail?");
+		return ret;
+	}
+	pr_debug("Downloaded OK!");
+	std::cout << to_string(f) << std::endl;
+
+	auto &loc = f->local_;
+	if (loc->path_ == "") {
+		pr_debug("Cannot find file path");
+		return ret;
+	}
+
+	if (!md5_file(loc->path_.c_str(), md5_buf)) {
+		pr_debug("md5_file failed: %s", strerror(errno));
+		return ret;
+	}
+
+	if (!sha1_file(loc->path_.c_str(), sha1_buf)) {
+		pr_debug("sha1_file failed: %s", strerror(errno));
+		return ret;
+	}
+
+	const char *file_ext = get_filename_ext(loc->path_.c_str());
+	std::cout << "File ex: " << file_ext << std::endl;
+
+	try {
+		const char query[] =
+			"INSERT INTO `gw_files` "	\
+			"("				\
+				"`tg_file_id`,"		\
+				"`tg_uniq_id`,"		\
+				"`md5_sum`,"		\
+				"`sha1_sum`,"		\
+				"`ext`,"		\
+				"`size`,"		\
+				"`created_at`"		\
+			") VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+		char dateBuf[64];
+		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
+		auto st = db->prepare(query);
+		st->execute(
+			PARAM_STRING(file.remote_->id_.c_str()),
+			PARAM_STRING(file.remote_->unique_id_.c_str()),
+			PARAM_BYTES(md5_buf, sizeof(md5_buf)),
+			PARAM_BYTES(sha1_buf, sizeof(sha1_buf)),
+			PARAM_STRING(file_ext),
+			PARAM_UINT((uint64_t)loc->downloaded_size_),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+		ret = lastInsertId_static(db);
+	} catch (std::string &err) {
+		std::cout << err << std::endl;
+		throw err;
+	}
+	return ret;
+}
+
+
 #define MAX_WRK (100u)
 
 static std::mutex wrk_mut;
 static std::condition_variable wrk_cond;
 static std::atomic<uint32_t> wrk_online = 0;
+static bool init = false;
+
+
+struct db_pool {
+	tgvisd::DB *db;
+	uint16_t idx;
+};
+
+std::mutex pool_mutex;
+static std::vector<struct db_pool> wrk_db_pool;
+static std::stack<uint16_t> wrk_db_pstack;
+
+
+static void putWrkDb(struct db_pool *pl)
+{
+	pool_mutex.lock();
+	wrk_db_pstack.push(pl->idx);
+	pool_mutex.unlock();
+}
+
+
+static struct db_pool *getWrkDb(void)
+{
+	struct db_pool *ret = nullptr;
+	uint16_t idx;
+	pool_mutex.lock();
+	if (!wrk_db_pstack.empty()) {
+		idx = wrk_db_pstack.top();
+		wrk_db_pstack.pop();
+
+		if (!wrk_db_pool[idx].db) {
+			wrk_db_pool[idx].db = createDB();
+		}
+		ret = &wrk_db_pool[idx];
+	}
+	pool_mutex.unlock();
+	return ret;
+}
+
+
+
+static void initWrkDb(void)
+{
+	if (!init) {
+		init = true;
+		wrk_db_pool.reserve(200);
+		for (uint16_t i = 200; i--;) {
+			struct db_pool pl;
+			pl.db = nullptr;
+			pl.idx = i;
+			wrk_db_pool.push_back(pl);
+			putWrkDb(&pl);
+		}
+	}
+}
+
+
 
 static void wrk_wait(void)
 {
-	std::unique_lock<std::mutex> lock(wrk_mut, std::defer_lock);
+	pr_debug("wrk acquiring mutex...");
+	std::unique_lock<std::mutex> lock(wrk_mut);
 	while (atomic_load(&wrk_online) >= MAX_WRK) {
 		pr_debug("Waiting for workers to finish (count=%u)...",
 			 atomic_load(&wrk_online));
@@ -689,8 +842,10 @@ static void wrk_wait(void)
 			return !(atomic_load(&wrk_online) >= MAX_WRK);
 		});
 	}
-	printf("Wrk go! (count=%u)\n", atomic_load(&wrk_online));
+	pr_debug("Wrk go! (count=%u)", atomic_load(&wrk_online));
+	initWrkDb();
 }
+
 
 
 void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
@@ -698,7 +853,11 @@ void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	wrk_wait();
 	std::thread worker([this, db_msg_id, &msg](void){
 		atomic_fetch_add(&wrk_online, 1);
-		this->_insertMsgDataPhoto(db_msg_id, msg);
+		try {
+			this->_insertMsgDataPhoto(db_msg_id, msg);
+		} catch (std::string &err) {
+			std::cout << err << std::endl;
+		}
 		atomic_fetch_sub(&wrk_online, 1);
 	});
 #if defined(__linux__)
@@ -715,6 +874,7 @@ void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 
 void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 {
+	uint64_t file_id;
 	auto &msgPhoto = static_cast<td_api::messagePhoto &>(*msg.content_);
 	const char *text = msgPhoto.caption_->text_.c_str();
 	td_api::file *taken_file = nullptr;
@@ -734,10 +894,40 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	if (!taken_file)
 		return;
 
-	pr_debug("Downloading file...");
-	auto f = downloadFile(taken_file->id_);
-	pr_debug("Downloaded OK!");
-	std::cout << to_string(f) << std::endl;
+	struct db_pool *dbp = getWrkDb();
+	if (!dbp) {
+		puts("DB pool is full!");
+		abort();
+	}
+	auto db = dbp->db;
+	file_id = resolveFile(db, *taken_file);
+
+	{
+		const char query[] =
+			"INSERT INTO `gw_group_message_data`"	\
+			"("					\
+				"`msg_id`,"			\
+				"`text`,"			\
+				"`text_entities`,"		\
+				"`file`,"			\
+				"`is_edited`,"			\
+				"`tg_date`,"			\
+				"`created_at`"			\
+			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
+		auto st = db_->prepare(query);
+		char dateBuf1[64], dateBuf2[64];
+		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(text),
+			PARAM_UINT(file_id),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	}
+	putWrkDb(dbp);
 }
 
 

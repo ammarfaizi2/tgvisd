@@ -19,6 +19,10 @@
 
 #include "md5_php.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* SHA1 context. */
 typedef struct {
 	uint32_t state[5];		/* state (ABCD) */
@@ -33,5 +37,9 @@ void PHP_SHA1Final(unsigned char[20], PHP_SHA1_CTX *);
 void make_sha1_digest(char *sha1str, const unsigned char *digest);
 
 unsigned char *sha1_file(const char *filename, unsigned char *digest);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
 
 #endif

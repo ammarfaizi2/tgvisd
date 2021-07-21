@@ -1,7 +1,7 @@
 
 cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 
-project(TeaBot VERSION 8.3 LANGUAGES CXX)
+project(TeaBot VERSION 8.3 LANGUAGES C CXX)
 
 find_package(Td 1.7.5 REQUIRED)
 
@@ -30,8 +30,18 @@ set(TGVISD_MODULES_SOURCE
 )
 
 
+# Extension
+set(TGVISD_EXT_SOURCES
+  src/ext/md5_php.c
+  src/ext/md5_php.h
+  src/ext/sha1_php.c
+  src/ext/sha1_php.h
+)
+
+
 # Main
 set(TGVISD_MAIN_SOURCE
+  src/tgvisd/common.hpp
   src/tgvisd/common.hpp
   src/tgvisd/DB.cpp
   src/tgvisd/DB.hpp
@@ -46,6 +56,7 @@ set(TGVISD_MAIN_SOURCE
   src/tgvisd/Main/Worker.cpp
   src/tgvisd/Main/Worker.hpp
   ${TGVISD_MODULES_SOURCE}
+  ${TGVISD_EXT_SOURCES}
 )
 
 
@@ -67,13 +78,11 @@ target_compile_options(tgvisd-td PRIVATE
 link_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/build)
 include_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/include)
 
+
 ## Build the main binary (static)
 add_executable(tgvisd ${TGVISD_MAIN_SOURCE})
-
-## Build the main binary (shared)
-# add_library(tgvisd SHARED ${TGVISD_MAIN_SOURCE})
-
 set_property(TARGET tgvisd PROPERTY CXX_STANDARD 20)
+set_property(TARGET tgvisd PROPERTY C_STANDARD 11)
 target_link_libraries(tgvisd tgvisd-td pthread curl mysqlcppconn8)
 target_include_directories(tgvisd PRIVATE td/include)
 target_compile_options(tgvisd PRIVATE
