@@ -312,17 +312,17 @@ void Worker::run(void)
 	}
 	
 
-	try {
+	// try {
 		sleep(2);
 		getChats();
 		sleep(2);
 		db_ = createDB();
 		gatherChatEventLog(-1001483770714); // GNU/Weeb
 		// gatherChatEventLog(-1001226735471); // Private Cloud
-	} catch (std::string &err) {
-		std::cout << "Error: " << err << std::endl;
-		throw err;
-	}
+	// } catch (std::string &err) {
+	// 	std::cout << "Error: " << err << std::endl;
+	// 	throw err;
+	// }
 }
 
 
