@@ -102,6 +102,8 @@ private:
 	void _insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg);
 	void insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
 	void _insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
+	void insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
+				 const char *text, td_api::file &file);
 	bool trackEventId(int64_t event_id);
 };
 
@@ -815,83 +817,82 @@ uint64_t Worker::resolveFile(tgvisd::DB *db, td_api::file &file)
 }
 
 
-#define MAX_WRK (100u)
+// #define MAX_WRK (100u)
 
-static std::mutex wrk_mut;
-static std::condition_variable wrk_cond;
-static std::atomic<uint32_t> wrk_online = 0;
-static bool init = false;
-
-
-struct db_pool {
-	tgvisd::DB *db;
-	uint16_t idx;
-};
-
-std::mutex pool_mutex;
-static std::vector<struct db_pool> wrk_db_pool;
-static std::stack<uint16_t> wrk_db_pstack;
+// static std::mutex wrk_mut;
+// static std::condition_variable wrk_cond;
+// static std::atomic<uint32_t> wrk_online = 0;
+// static bool init = false;
 
 
-static void putWrkDb(struct db_pool *pl)
-{
-	pool_mutex.lock();
-	wrk_db_pstack.push(pl->idx);
-	pool_mutex.unlock();
-}
+// struct db_pool {
+// 	tgvisd::DB *db;
+// 	uint16_t idx;
+// };
+
+// std::mutex pool_mutex;
+// static std::vector<struct db_pool> wrk_db_pool;
+// static std::stack<uint16_t> wrk_db_pstack;
 
 
-static struct db_pool *getWrkDb(void)
-{
-	struct db_pool *ret = nullptr;
-	uint16_t idx;
-	pool_mutex.lock();
-	if (!wrk_db_pstack.empty()) {
-		idx = wrk_db_pstack.top();
-		wrk_db_pstack.pop();
-
-		if (!wrk_db_pool[idx].db) {
-			wrk_db_pool[idx].db = createDB();
-		}
-		ret = &wrk_db_pool[idx];
-	}
-	pool_mutex.unlock();
-	return ret;
-}
+// static void putWrkDb(struct db_pool *pl)
+// {
+// 	pool_mutex.lock();
+// 	wrk_db_pstack.push(pl->idx);
+// 	pool_mutex.unlock();
+// }
 
 
+// static struct db_pool *getWrkDb(void)
+// {
+// 	struct db_pool *ret = nullptr;
+// 	uint16_t idx;
+// 	pool_mutex.lock();
+// 	if (!wrk_db_pstack.empty()) {
+// 		idx = wrk_db_pstack.top();
+// 		wrk_db_pstack.pop();
 
-static void initWrkDb(void)
-{
-	if (!init) {
-		init = true;
-		wrk_db_pool.reserve(200);
-		for (uint16_t i = 200; i--;) {
-			struct db_pool pl;
-			pl.db = nullptr;
-			pl.idx = i;
-			wrk_db_pool.push_back(pl);
-			putWrkDb(&pl);
-		}
-	}
-}
+// 		if (!wrk_db_pool[idx].db) {
+// 			wrk_db_pool[idx].db = createDB();
+// 		}
+// 		ret = &wrk_db_pool[idx];
+// 	}
+// 	pool_mutex.unlock();
+// 	return ret;
+// }
+
+
+// static void initWrkDb(void)
+// {
+// 	if (!init) {
+// 		init = true;
+// 		wrk_db_pool.reserve(200);
+// 		for (uint16_t i = 200; i--;) {
+// 			struct db_pool pl;
+// 			pl.db = nullptr;
+// 			pl.idx = i;
+// 			wrk_db_pool.push_back(pl);
+// 			putWrkDb(&pl);
+// 		}
+// 	}
+// }
 
 
 
-static void wrk_wait(void)
-{
-	pr_debug("wrk acquiring mutex...");
-	std::unique_lock<std::mutex> lock(wrk_mut);
-	while (atomic_load(&wrk_online) >= MAX_WRK) {
-		pr_debug("Waiting for workers to finish (count=%u)...",
-			 atomic_load(&wrk_online));
-		wrk_cond.wait_for(lock, 1000ms, [](){
-			return !(atomic_load(&wrk_online) >= MAX_WRK);
-		});
-	}
-	pr_debug("Wrk go! (count=%u)", atomic_load(&wrk_online));
-	initWrkDb();
-}
+// static void wrk_wait(void)
+// {
+// 	pr_debug("wrk acquiring mutex...");
+// 	std::unique_lock<std::mutex> lock(wrk_mut);
+// 	while (atomic_load(&wrk_online) >= MAX_WRK) {
+// 		pr_debug("Waiting for workers to finish (count=%u)...",
+// 			 atomic_load(&wrk_online));
+// 		wrk_cond.wait_for(lock, 1000ms, [](){
+// 			return !(atomic_load(&wrk_online) >= MAX_WRK);
+// 		});
+// 	}
+// 	pr_debug("Wrk go! (count=%u)", atomic_load(&wrk_online));
+// 	initWrkDb();
+// }
 
 
 void Worker::insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
@@ -908,44 +909,9 @@ void Worker::insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 
 void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 {
-	uint64_t file_id;
 	auto &msgDoc = static_cast<td_api::messageDocument &>(*msg.content_);
 	const char *text = msgDoc.caption_->text_.c_str();
-
-	// struct db_pool *dbp = getWrkDb();
-	// if (!dbp) {
-	// 	puts("DB pool is full!");
-	// 	abort();
-	// }
-	auto db = db_; // dbp->db;
-	file_id = resolveFile(db, *msgDoc.document_->document_);
-
-	{
-		const char query[] =
-			"INSERT INTO `gw_group_message_data`"	\
-			"("					\
-				"`msg_id`,"			\
-				"`text`,"			\
-				"`text_entities`,"		\
-				"`file`,"			\
-				"`is_edited`,"			\
-				"`tg_date`,"			\
-				"`created_at`"			\
-			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
-		auto st = db_->prepare(query);
-		char dateBuf1[64], dateBuf2[64];
-		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
-		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(text),
-			PARAM_UINT(file_id),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(dateNow),
-			PARAM_END
-		);
-	}
-	// putWrkDb(dbp);
+	insertMsgData__file(db_msg_id, msg, text, *msgDoc.document_->document_);
 }
 
 
@@ -956,51 +922,14 @@ void Worker::insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
 	} catch (std::string &err) {
 		std::cout << err << std::endl;
 	}
-	return;
-
 }
 
 
 void Worker::_insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
 {
-	uint64_t file_id;
 	auto &msgVideo = static_cast<td_api::messageVideo &>(*msg.content_);
 	const char *text = msgVideo.caption_->text_.c_str();
-
-	// struct db_pool *dbp = getWrkDb();
-	// if (!dbp) {
-	// 	puts("DB pool is full!");
-	// 	abort();
-	// }
-	auto db = db_; // dbp->db;
-	file_id = resolveFile(db, *msgVideo.video_->video_);
-
-	{
-		const char query[] =
-			"INSERT INTO `gw_group_message_data`"	\
-			"("					\
-				"`msg_id`,"			\
-				"`text`,"			\
-				"`text_entities`,"		\
-				"`file`,"			\
-				"`is_edited`,"			\
-				"`tg_date`,"			\
-				"`created_at`"			\
-			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
-		auto st = db_->prepare(query);
-		char dateBuf1[64], dateBuf2[64];
-		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
-		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(text),
-			PARAM_UINT(file_id),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(dateNow),
-			PARAM_END
-		);
-	}
-	// putWrkDb(dbp);
+	insertMsgData__file(db_msg_id, msg, text, *msgVideo.video_->video_);
 }
 
 
@@ -1011,51 +940,14 @@ void Worker::insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
 	} catch (std::string &err) {
 		std::cout << err << std::endl;
 	}
-	return;
-
 }
 
 
 void Worker::_insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
 {
-	uint64_t file_id;
 	auto &msgAnim = static_cast<td_api::messageAnimation &>(*msg.content_);
 	const char *text = msgAnim.caption_->text_.c_str();
-
-	// struct db_pool *dbp = getWrkDb();
-	// if (!dbp) {
-	// 	puts("DB pool is full!");
-	// 	abort();
-	// }
-	auto db = db_; // dbp->db;
-	file_id = resolveFile(db, *msgAnim.animation_->animation_);
-
-	{
-		const char query[] =
-			"INSERT INTO `gw_group_message_data`"	\
-			"("					\
-				"`msg_id`,"			\
-				"`text`,"			\
-				"`text_entities`,"		\
-				"`file`,"			\
-				"`is_edited`,"			\
-				"`tg_date`,"			\
-				"`created_at`"			\
-			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
-		auto st = db_->prepare(query);
-		char dateBuf1[64], dateBuf2[64];
-		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
-		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(text),
-			PARAM_UINT(file_id),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(dateNow),
-			PARAM_END
-		);
-	}
-	// putWrkDb(dbp);
+	insertMsgData__file(db_msg_id, msg, text, *msgAnim.animation_->animation_);
 }
 
 
@@ -1066,50 +958,14 @@ void Worker::insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
 	} catch (std::string &err) {
 		std::cout << err << std::endl;
 	}
-	return;
 }
 
 
 void Worker::_insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
 {
-	uint64_t file_id;
 	auto &msgSticker = static_cast<td_api::messageSticker &>(*msg.content_);
 	const char *text = msgSticker.sticker_->emoji_.c_str();
-
-	// struct db_pool *dbp = getWrkDb();
-	// if (!dbp) {
-	// 	puts("DB pool is full!");
-	// 	abort();
-	// }
-	auto db = db_; // dbp->db;
-	file_id = resolveFile(db, *msgSticker.sticker_->sticker_);
-
-	{
-		const char query[] =
-			"INSERT INTO `gw_group_message_data`"	\
-			"("					\
-				"`msg_id`,"			\
-				"`text`,"			\
-				"`text_entities`,"		\
-				"`file`,"			\
-				"`is_edited`,"			\
-				"`tg_date`,"			\
-				"`created_at`"			\
-			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
-		auto st = db_->prepare(query);
-		char dateBuf1[64], dateBuf2[64];
-		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
-		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(text),
-			PARAM_UINT(file_id),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(dateNow),
-			PARAM_END
-		);
-	}
-	// putWrkDb(dbp);
+	insertMsgData__file(db_msg_id, msg, text, *msgSticker.sticker_->sticker_);
 }
 
 
@@ -1123,31 +979,30 @@ void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	return;
 
 
-	wrk_wait();
-	std::thread worker([this, db_msg_id, &msg](void){
-		atomic_fetch_add(&wrk_online, 1);
-		try {
-			this->_insertMsgDataPhoto(db_msg_id, msg);
-		} catch (std::string &err) {
-			std::cout << err << std::endl;
-		}
-		atomic_fetch_sub(&wrk_online, 1);
-	});
-#if defined(__linux__)
-	{
-		char trname[32];
-		pthread_t pt = worker.native_handle();
-		snprintf(trname, sizeof(trname), "photo-download");
-		pthread_setname_np(pt, trname);
-	}
-#endif
-	worker.detach();
+// 	wrk_wait();
+// 	std::thread worker([this, db_msg_id, &msg](void){
+// 		atomic_fetch_add(&wrk_online, 1);
+// 		try {
+// 			this->_insertMsgDataPhoto(db_msg_id, msg);
+// 		} catch (std::string &err) {
+// 			std::cout << err << std::endl;
+// 		}
+// 		atomic_fetch_sub(&wrk_online, 1);
+// 	});
+// #if defined(__linux__)
+// 	{
+// 		char trname[32];
+// 		pthread_t pt = worker.native_handle();
+// 		snprintf(trname, sizeof(trname), "photo-download");
+// 		pthread_setname_np(pt, trname);
+// 	}
+// #endif
+// 	worker.detach();
 }
 
 
 void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 {
-	uint64_t file_id;
 	auto &msgPhoto = static_cast<td_api::messagePhoto &>(*msg.content_);
 	const char *text = msgPhoto.caption_->text_.c_str();
 	td_api::file *taken_file = nullptr;
@@ -1167,39 +1022,44 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	if (!taken_file)
 		return;
 
+	insertMsgData__file(db_msg_id, msg, text, *taken_file);
+}
+
+
+void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
+				 const char *text, td_api::file &file)
+{
 	// struct db_pool *dbp = getWrkDb();
 	// if (!dbp) {
 	// 	puts("DB pool is full!");
 	// 	abort();
 	// }
+	uint64_t file_id;
 	auto db = db_; // dbp->db;
-	file_id = resolveFile(db, *taken_file);
-
-	{
-		const char query[] =
-			"INSERT INTO `gw_group_message_data`"	\
-			"("					\
-				"`msg_id`,"			\
-				"`text`,"			\
-				"`text_entities`,"		\
-				"`file`,"			\
-				"`is_edited`,"			\
-				"`tg_date`,"			\
-				"`created_at`"			\
-			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
-		auto st = db_->prepare(query);
-		char dateBuf1[64], dateBuf2[64];
-		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
-		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(text),
-			PARAM_UINT(file_id),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(dateNow),
-			PARAM_END
-		);
-	}
+	file_id = resolveFile(db, file);
+	const char query[] =
+		"INSERT INTO `gw_group_message_data`"	\
+		"("					\
+			"`msg_id`,"			\
+			"`text`,"			\
+			"`text_entities`,"		\
+			"`file`,"			\
+			"`is_edited`,"			\
+			"`tg_date`,"			\
+			"`created_at`"			\
+		") VALUES (?, ?, NULL, ?, '0', ?, ?);";
+	auto st = db_->prepare(query);
+	char dateBuf1[64], dateBuf2[64];
+	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
+	st->execute(
+		PARAM_UINT(db_msg_id),
+		PARAM_STRING(text),
+		PARAM_UINT(file_id),
+		PARAM_STRING(msgDate),
+		PARAM_STRING(dateNow),
+		PARAM_END
+	);
 	// putWrkDb(dbp);
 }
 
