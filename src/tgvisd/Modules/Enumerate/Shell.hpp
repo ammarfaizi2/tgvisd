@@ -7,8 +7,8 @@
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
-#ifndef TGVISD__MODULES__ENUMERATE__SHELL__SHELL_HPP
-#define TGVISD__MODULES__ENUMERATE__SHELL__SHELL_HPP
+#ifndef TGVISD__MODULES__ENUMERATE__SHELL_HPP
+#define TGVISD__MODULES__ENUMERATE__SHELL_HPP
 
 #include <tgvisd/Modules/BaseEnumerate.hpp>
 
@@ -27,4 +27,4 @@ public:
 
 } /* namespace tgvisd::Modules::Enumerate */
 
-#endif /* #ifndef TGVISD__MODULES__ENUMERATE__SHELL__SHELL_HPP */
+#endif /* #ifndef TGVISD__MODULES__ENUMERATE__SHELL_HPP */

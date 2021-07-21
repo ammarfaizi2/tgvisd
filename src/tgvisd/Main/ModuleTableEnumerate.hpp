@@ -17,7 +17,7 @@ using tgvisd::Modules::BaseEnumerate;
 
 #else /* #ifdef TAKE_MODULE_TABLE_DEFINITION */
 
-BaseEnumerate *moduleTableEnumerate_[2] = {
+BaseEnumerate *moduleTableEnumerate_[3] = {
 	new tgvisd::Modules::Enumerate::Shell(),
 	nullptr
 };

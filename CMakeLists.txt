@@ -33,6 +33,11 @@ set(TGVISD_MODULES_SOURCE
 # Main
 set(TGVISD_MAIN_SOURCE
   src/tgvisd/common.hpp
+  src/tgvisd/DB.cpp
+  src/tgvisd/DB.hpp
+  src/tgvisd/DBCommon.hpp
+  src/tgvisd/DBt/PreparedStatement.cpp
+  src/tgvisd/DBt/PreparedStatement.hpp
   src/tgvisd/main.cpp
   src/tgvisd/Main/Main.cpp
   src/tgvisd/Main/Main.hpp
@@ -62,17 +67,20 @@ target_compile_options(tgvisd-td PRIVATE
 link_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/build)
 include_directories(${CMAKE_SOURCE_DIR}/src/mysql_cpp/include)
 
-# Build the main binary
+## Build the main binary (static)
 add_executable(tgvisd ${TGVISD_MAIN_SOURCE})
+
+## Build the main binary (shared)
+# add_library(tgvisd SHARED ${TGVISD_MAIN_SOURCE})
+
 set_property(TARGET tgvisd PROPERTY CXX_STANDARD 20)
-target_link_libraries(tgvisd asan tgvisd-td pthread curl mysqlcppconn8)
+target_link_libraries(tgvisd tgvisd-td pthread curl mysqlcppconn8)
 target_include_directories(tgvisd PRIVATE td/include)
 target_compile_options(tgvisd PRIVATE
   -ggdb3
   -Wall
   -Wextra
   -Wpedantic
-  -fsanitize=address
   -Wno-unused-parameter
   -fno-omit-frame-pointer
   -fstack-protector-strong

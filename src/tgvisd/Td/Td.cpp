@@ -7,7 +7,6 @@
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
-#include <iostream>
 #include "Td.hpp"
 
 namespace tgvisd::Td {
@@ -105,7 +104,8 @@ void Td::on_authorization_state_update(void)
 		auto callback = [this](Object obj){
 			if (obj->get_id() != td_api::user::ID)
 				return;
-			user_id_ = (td::move_tl_object_as<td_api::user>(obj))->id_;
+			auto user = td::move_tl_object_as<td_api::user>(obj);
+			user_id_ = user->id_;
 		};
 
 		/*
@@ -119,7 +119,7 @@ void Td::on_authorization_state_update(void)
 		std::cout << "Logging out" << std::endl;
 	};
 
-	auto as_closing = [this](td_api::authorizationStateClosing &) {
+	auto as_closing = [](td_api::authorizationStateClosing &) {
 		std::cout << "Closing TdLib..." << std::endl;
 	};
 
@@ -165,7 +165,9 @@ void Td::on_authorization_state_update(void)
 		send_query(std::move(f), create_authentication_query_handler());
 	};
 
-	auto as_wait_odc = [this](td_api::authorizationStateWaitOtherDeviceConfirmation &state) {
+	auto as_wait_odc = [](
+		td_api::authorizationStateWaitOtherDeviceConfirmation &state) {
+
 		std::cout
 			<< "Confirm this login link on another device: "
 			<< state.link_

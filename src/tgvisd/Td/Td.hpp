@@ -23,6 +23,10 @@
 #include <functional>
 #include <unordered_map>
 
+#include <chrono>
+#include <iostream>
+#include <condition_variable>
+
 namespace td_api = td::td_api;
 using Object = td_api::object_ptr<td_api::Object>;
 
@@ -35,6 +39,7 @@ using std::string;
 using std::function;
 using std::unique_ptr;
 using std::unordered_map;
+using namespace std::chrono_literals;
 
 class Td {
 public:
@@ -45,6 +50,16 @@ public:
 	void close(void);
 	void send_query(td_api::object_ptr<td_api::Function> f,
 			std::function<void(Object)> handler);
+
+	inline void send_query(td_api::object_ptr<td_api::Function> f)
+	{
+		return send_query(std::move(f), {});
+	}
+
+	template <typename METHOD, typename RETURN>
+	td_api::object_ptr<RETURN> send_query_sync(
+		td_api::object_ptr<METHOD> method
+	);
 
 	inline int64_t get_sess_user_id()
 	{
@@ -88,6 +103,56 @@ private:
 		return atomic_fetch_add(&current_query_id_, 1);
 	}
 };
+
+
+template <typename METHOD, typename RETURN>
+td_api::object_ptr<RETURN> Td::send_query_sync(td_api::object_ptr<METHOD> method)
+{
+	std::mutex mut;
+	bool finished = false;
+	std::condition_variable cond;
+	std::unique_lock<std::mutex> lock(mut, std::defer_lock);
+	td_api::object_ptr<RETURN> retVal;
+
+	uint32_t warnCounter = 0;
+	const uint32_t warnAtCounter = 60;
+
+	auto callback = [&](td_api::object_ptr<td_api::Object> obj) {
+
+		if (obj->get_id() == td_api::error::ID) {
+			auto err = td::move_tl_object_as<td_api::error>(obj);
+			printf("Error on doQuerySync: %s\n",
+			       err->message_.c_str());
+			goto out;
+		}
+
+		if (obj->get_id() != RETURN::ID) {
+			puts("Invalid object returned on send_query_sync");
+			goto out;
+		}
+
+		retVal = td::move_tl_object_as<RETURN>(obj);
+	out:
+		finished = true;
+		cond.notify_one();
+	};
+
+	send_query(std::move(method), callback);
+
+	lock.lock();
+	while (!finished) {
+		cond.wait_for(lock, 1000ms, [&finished](void){
+			return finished;
+		});
+
+		if (++warnCounter > warnAtCounter) {
+			printf("Warning: Td::send_query_sync stall for %us\n",
+			       warnCounter);
+		}
+	}
+
+	return retVal;
+}
 
 } /* namespace tgvisd::Td */
 

@@ -12,7 +12,6 @@
 #include <cassert>
 #include <iostream>
 
-#include "HistoryScraper.hpp"
 #include "Main.hpp"
 #include "Module.hpp"
 #include "Worker.hpp"
