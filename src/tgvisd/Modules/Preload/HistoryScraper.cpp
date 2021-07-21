@@ -17,6 +17,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
+#include <atomic>
 #include <unordered_map>
 #include <condition_variable>
 
@@ -61,6 +62,7 @@ public:
 	td_api::object_ptr<td_api::chat> getChat(int64_t chat_id);
 	td_api::object_ptr<td_api::chats> getChats(void);
 	td_api::object_ptr<td_api::messages> getChatHistory(int64_t chat_id);
+	td_api::object_ptr<td_api::file> downloadFile();
 
 	void gatherChatEventLog(int64_t chat_id);
 	int64_t processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
@@ -82,7 +84,9 @@ private:
 	std::unordered_map<std::int64_t, td_api::chat> groupMap_;
 
 	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
-	bool trackEventId(int64_t event_id);
+	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
+	void _insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
+	bool trackEventId(int64_t event_id);	
 };
 
 
@@ -258,6 +262,15 @@ void Worker::gatherChatEventLog(int64_t chat_id)
 	std::vector<int32_t> user_ids;
 	printf("In gatherChatEventLog\n");
 
+	// auto st = db_->prepare("SELECT MIN(id) FROM track_event_id;");
+	// st->execute();
+	// if (auto row = st->fetch()) {
+	// 	uint64_t t_min = 0;
+	// 	IS_OK(mysqlx_get_uint(row, 0, &t_min), st->getStmt());
+	// 	min_ev = t_min;
+	// 	pr_debug("min_ev from DB: %ld", min_ev);
+	// }
+
 	while (min_ev != -1) {
 		auto events = td_->send_query_sync<
 			td_api::getChatEventLog,
@@ -274,7 +287,7 @@ void Worker::gatherChatEventLog(int64_t chat_id)
 		);
 		
 		min_ev = processChatEventLog(std::move(events));
-		printf("min_ev = %ld\n", min_ev);
+		pr_debug("min_ev = %ld", min_ev);
 	}
 }
 
@@ -289,6 +302,7 @@ bool Worker::trackEventId(int64_t event_id)
 		);
 		st->execute();
 	} catch (std::string &err) {
+		pr_debug("skip dup: %ld", event_id);
 		return false;
 	}
 	return true;
@@ -339,8 +353,8 @@ void Worker::processMessage(td_api::message &msg)
 	// std::cout << to_string(user) << std::endl;
 	uint64_t db_user_id = resolveUser(*user_, &user);
 	uint64_t db_group_id = resolveGroup(*chat_, &chat);
-	printf("db_user_id = %lu\n", db_user_id);
-	printf("db_group_id = %lu\n", db_group_id);
+	// printf("db_user_id = %lu\n", db_user_id);
+	// printf("db_group_id = %lu\n", db_group_id);
 	resolveMessage(msg, db_user_id, db_group_id);
 }
 
@@ -542,6 +556,9 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	case td_api::messagePhoto::ID:
 		msg_type = "photo";
 		break;
+	case td_api::messageVideo::ID:
+		msg_type = "video";
+		break;
 	case td_api::messageSticker::ID:
 		msg_type = "sticker";
 		break;
@@ -554,8 +571,6 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	char dateBuf[64];
 	const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
 
-	printf("Inserting db_user_id = %lu\n", db_user_id);
-	printf("Inserting db_group_id = %lu\n", db_group_id);
 	auto st = db_->prepare(query);
 	st->bind(
 		PARAM_UINT(db_group_id),
@@ -572,6 +587,13 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	switch (msg.content_->get_id()) {
 	case td_api::messageText::ID:
 		insertMsgDataText(ret, msg);
+		break;
+	case td_api::messagePhoto::ID:
+		insertMsgDataPhoto(ret, msg);
+		break;
+	case td_api::messageVideo::ID:
+		break;
+	case td_api::messageSticker::ID:
 		break;
 	}
 
@@ -606,6 +628,51 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 		PARAM_END
 	);
 	st->execute();
+}
+
+#define MAX_WRK (100u)
+
+static std::mutex wrk_mut;
+static std::condition_variable wrk_cond;
+static std::atomic<uint32_t> wrk_online = 0;
+
+static void wrk_wait(void)
+{
+	std::unique_lock<std::mutex> lock(wrk_mut, std::defer_lock);
+	while (atomic_load(&wrk_online) >= MAX_WRK) {
+		pr_debug("Waiting for workers to finish (count=%u)...",
+			 atomic_load(&wrk_online));
+		wrk_cond.wait_for(lock, 1000ms, [](){
+			return !(atomic_load(&wrk_online) >= MAX_WRK);
+		});
+	}
+	printf("Wrk go! (count=%u)\n", atomic_load(&wrk_online));
+}
+
+
+void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
+{
+	wrk_wait();
+	std::thread worker([this, db_msg_id, &msg](void){
+		atomic_fetch_add(&wrk_online, 1);
+		this->_insertMsgDataPhoto(db_msg_id, msg);
+		atomic_fetch_sub(&wrk_online, 1);
+	});
+#if defined(__linux__)
+	{
+		char trname[32];
+		pthread_t pt = worker.native_handle();
+		snprintf(trname, sizeof(trname), "photo-download");
+		pthread_setname_np(pt, trname);
+	}
+#endif
+	worker.detach();
+}
+
+
+void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
+{
+
 }
 
 
