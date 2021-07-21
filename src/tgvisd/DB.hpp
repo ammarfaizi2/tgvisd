@@ -20,6 +20,7 @@ class DB
 {
 public:
 	DB(void);
+	~DB(void);
 	DB(const char *host, uint16_t port, const char *user, const char *pass,
 	   const char *database);
 	bool connect(void);
@@ -32,7 +33,7 @@ public:
 	}
 private:
 	char host_[128] = {0};
-	uint16_t port_ = 3306;
+	uint16_t port_ = 33060;
 	char user_[64] = {0};
 	char pass_[64] = {0};
 	char database_[64] = {0};

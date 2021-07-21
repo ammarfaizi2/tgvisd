@@ -11,6 +11,12 @@
 
 namespace tgvisd::DBt {
 
-
+PreparedStatement::~PreparedStatement(void)
+{
+	if (res_) {
+		mysqlx_free(res_);
+		res_ = nullptr;
+	}
+}
 
 } /* namespace tgvisd::DBt */

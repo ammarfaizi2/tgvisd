@@ -15,6 +15,8 @@
 #include <mutex>
 #include <chrono>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 #include <unordered_map>
 #include <condition_variable>
 
@@ -24,6 +26,7 @@
 
 namespace tgvisd::Modules::Preload {
 
+using tgvisd::DBt::PreparedStatement;
 using namespace std::chrono_literals;
 
 HistoryScraper::HistoryScraper(void)
@@ -33,6 +36,12 @@ HistoryScraper::HistoryScraper(void)
 class Worker
 {
 public:
+	inline ~Worker(void)
+	{
+		if (db_)
+			delete db_;
+	}
+
 	Worker(tgvisd::Main::Main *main);
 	void run(void);
 	inline bool stopUpdate(void)
@@ -48,16 +57,32 @@ public:
 
 	// void gatherMsg(void);
 	// void gatherMsgByChatId(int64_t chat_id);
-	// td_api::object_ptr<td_api::chat> getChat(int64_t chat_id);
-	// td_api::object_ptr<td_api::chats> getChats(void);
-	// td_api::object_ptr<td_api::messages> getChatHistory(int64_t chat_id);
+	td_api::object_ptr<td_api::user> getUser(int64_t user_id);
+	td_api::object_ptr<td_api::chat> getChat(int64_t chat_id);
+	td_api::object_ptr<td_api::chats> getChats(void);
+	td_api::object_ptr<td_api::messages> getChatHistory(int64_t chat_id);
 
 	void gatherChatEventLog(int64_t chat_id);
-	void processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
+	int64_t processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
+	void processMessage(td_api::message &msg);
+
+	uint64_t resolveUser(td_api::user &user, td_api::user **user_p);
+	int64_t resolveGroup(td_api::chat &chat, td_api::chat **chat_p);
+	uint64_t resolveMessage(td_api::message &msg, uint64_t db_user_id,
+				uint64_t db_group_id);
+	uint64_t lastInsertId(void);
 private:
+	tgvisd::DB *db_ = nullptr;
 	tgvisd::Td::Td *td_ = nullptr;
 	tgvisd::Main::Main *main_ = nullptr;
 
+	std::unordered_map<std::int64_t, std::uint64_t> userTgToDb_;
+	std::unordered_map<std::int64_t, std::uint64_t> groupTgToDb_;
+	std::unordered_map<std::uint64_t, td_api::user> userMap_;
+	std::unordered_map<std::int64_t, td_api::chat> groupMap_;
+
+	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
+	bool trackEventId(int64_t event_id);
 };
 
 
@@ -123,12 +148,21 @@ Worker::Worker(tgvisd::Main::Main *main):
 // }
 
 
-// td_api::object_ptr<td_api::chat> Worker::getChat(int64_t chat_id)
-// {
-// 	return td_->send_query_sync<td_api::getChat, td_api::chat>(
-// 		td_api::make_object<td_api::getChat>(chat_id)
-// 	);
-// }
+td_api::object_ptr<td_api::chat> Worker::getChat(int64_t chat_id)
+{
+	return td_->send_query_sync<td_api::getChat, td_api::chat>(
+		td_api::make_object<td_api::getChat>(chat_id)
+	);
+}
+
+
+td_api::object_ptr<td_api::user> Worker::getUser(int64_t user_id)
+{
+	printf("In getUser(): %ld\n", user_id);
+	return td_->send_query_sync<td_api::getUser, td_api::user>(
+		td_api::make_object<td_api::getUser>(user_id)
+	);
+}
 
 
 // void Worker::gatherMsg(void)
@@ -199,66 +233,379 @@ Worker::Worker(tgvisd::Main::Main *main):
 
 void Worker::run(void)
 {
-	// tgvisd::DB db("127.0.0.1", 0, "memmove");
-	// tgvisd::Main::Main *main = main_;
+	const char *dbpass = getenv("DB_PASS");
+	if (!dbpass)
+		abort();
 
-	// while (likely(!main->stopUpdate())) {
-	// 	// gatherMsg();
-	// 	sleep(1);
-	// }
-
-
-
-	sleep(2);
+	// sleep(2);
 	// gatherChatEventLog(-1001226735471); // Private Cloud
-	// gatherChatEventLog(-1001483770714); // GNU/Weeb
+
+	try {
+		sleep(2);
+		db_ = new tgvisd::DB("127.0.0.1", 0, "gw_telegram", dbpass, "gw_telegram");
+		db_->connect();
+		gatherChatEventLog(-1001483770714); // GNU/Weeb
+	} catch (std::string &err) {
+		std::cout << "Error: " << err << std::endl;
+		throw err;
+	}
 }
 
 
 void Worker::gatherChatEventLog(int64_t chat_id)
 {
+	int64_t min_ev = 0;
 	std::vector<int32_t> user_ids;
 	printf("In gatherChatEventLog\n");
-	td_->send_query(
-		td_api::make_object<td_api::getChatEventLog>(
-			chat_id,
-			"",
-			0,
-			100,
-			nullptr,
-			std::move(user_ids)
-		),
-		[this](td_api::object_ptr<td_api::Object> obj){
-			if (obj->get_id() == td_api::error::ID) {
-				auto err = td::move_tl_object_as<td_api::error>(obj);
-				printf("Error on gatherChatEventLog: %s\n",
-				       err->message_.c_str());
-				return;
-			}
 
-			if (obj->get_id() != td_api::chatEvents::ID) {
-				printf("Wrong object on gatherChatEventLog\n");
-				return;
-			}
-
-			this->processChatEventLog(
-				td::move_tl_object_as<td_api::chatEvents>(obj)
-			);
-		}
-	);
+	while (min_ev != -1) {
+		auto events = td_->send_query_sync<
+			td_api::getChatEventLog,
+			td_api::chatEvents
+		>(
+			td_api::make_object<td_api::getChatEventLog>(
+				chat_id,
+				"",
+				min_ev,
+				100,
+				nullptr,
+				std::move(user_ids)
+			)
+		);
+		
+		min_ev = processChatEventLog(std::move(events));
+		printf("min_ev = %ld\n", min_ev);
+	}
 }
 
 
-void Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> events)
+bool Worker::trackEventId(int64_t event_id)
 {
+	try {
+		auto st = db_->prepare("INSERT INTO track_event_id VALUES (?)");
+		st->bind(
+			PARAM_UINT(event_id),
+			PARAM_END
+		);
+		st->execute();
+	} catch (std::string &err) {
+		return false;
+	}
+	return true;
+}
+
+
+int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> events)
+{
+	printf("In processChatEventLog\n");
+	int64_t min_event = -1;
+	size_t i = 0;
 	for (auto &ev: events->events_) {
+		if (i == 0) {
+			min_event = ev->id_;
+		} else if (ev->id_ < min_event) {
+			min_event = ev->id_;
+		}
+		i++;
+
+		if (!trackEventId(ev->id_))
+			continue;
 
 		if (ev->action_->get_id() != td_api::chatEventMessageDeleted::ID)
 			continue;
-
 		auto &msg = static_cast<td_api::chatEventMessageDeleted &>(*ev->action_).message_;
-		std::cout << to_string(msg) << std::endl;
+		processMessage(*msg);
 	}
+	return min_event;
+}
+
+
+void Worker::processMessage(td_api::message &msg)
+{
+	printf("In processMessage\n");
+	if (msg.sender_->get_id() != td_api::messageSenderUser::ID)
+		return;
+
+	auto user_ = getUser(
+		static_cast<td_api::messageSenderUser &>(*msg.sender_).user_id_
+	);
+	td_api::user *user;
+	auto chat_ = getChat(msg.chat_id_);
+	td_api::chat *chat;
+
+
+	// std::cout << to_string(msg) << std::endl;
+
+	// std::cout << to_string(user) << std::endl;
+	uint64_t db_user_id = resolveUser(*user_, &user);
+	uint64_t db_group_id = resolveGroup(*chat_, &chat);
+	printf("db_user_id = %lu\n", db_user_id);
+	printf("db_group_id = %lu\n", db_group_id);
+	resolveMessage(msg, db_user_id, db_group_id);
+}
+
+
+static char *getDateByUnixTM(time_t epoch, char *buffer, size_t len)
+{
+	strftime(buffer, len, "%Y-%m-%d %H:%I:%S", gmtime(&epoch));
+	return buffer;
+}
+
+
+static char *getDateNow(char *buffer, size_t len)
+{
+	time_t epoch_now = std::time(nullptr);
+	return getDateByUnixTM(epoch_now, buffer, len);
+}
+
+
+uint64_t Worker::lastInsertId(void)
+{
+	uint64_t ret = 0;
+	auto st = db_->prepare("SELECT LAST_INSERT_ID();");
+	st->execute();
+	if (auto row = st->fetch()) {
+		IS_OK(mysqlx_get_uint(row, 0, &ret), st->getStmt());
+	}
+	return ret;
+}
+
+
+uint64_t Worker::resolveUser(td_api::user &user, td_api::user **user_p)
+{
+	uint64_t ret = 0;
+	std::unique_ptr<PreparedStatement> st;
+	const char query[] = 
+		"INSERT INTO `gw_users` "		\
+		"(" 					\
+			"`tg_user_id`,"			\
+			"`username`," 			\
+			"`first_name`,"			\
+			"`last_name`,"			\
+			"`is_bot`,"			\
+			"`created_at`,"			\
+			"`updated_at`"			\
+		")" 					\
+		" VALUES (?, ?, ?, ?, '0', ?, NULL);";
+
+	std::unordered_map<int64_t, uint64_t>::const_iterator got =
+		userTgToDb_.find(user.id_);
+
+	if (!(got == userTgToDb_.end())) {
+		ret = got->second;
+		goto out_no_move;
+	}
+
+	st = db_->prepare(query);
+	try {
+		char dateBuf[64];
+		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
+		st->bind(
+			PARAM_UINT((uint64_t)user.id_),
+			PARAM_STRING(user.username_.c_str()),
+			PARAM_STRING(user.first_name_.c_str()),
+			PARAM_STRING(user.last_name_.c_str()),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+		st->execute();
+	} catch (std::string &err) {
+		goto do_fetch;
+	}
+
+	if ((ret = lastInsertId()))
+		goto out;
+
+do_fetch:
+	pr_debug("Fetching from DB (user)...");
+	st = db_->prepare("SELECT id FROM gw_users WHERE tg_user_id = ?");
+	st->bind(
+		PARAM_SINT((uint64_t)user.id_),
+		PARAM_END
+	);
+	st->execute();
+
+	if (auto row = st->fetch()) {
+		IS_OK(mysqlx_get_uint(row, 0, &ret), st->getStmt());
+		printf("fetched = %lu\n", ret);
+		if (ret)
+			goto out;
+	}
+
+out_no_move:
+	*user_p = &user;
+	return ret;
+
+out:
+	userTgToDb_.insert_or_assign(user.id_, ret);
+	userMap_.insert_or_assign(ret, std::move(user));
+	*user_p = &userMap_[ret];
+	return ret;
+}
+
+
+int64_t Worker::resolveGroup(td_api::chat &chat, td_api::chat **chat_p)
+{
+	uint64_t ret = 0;
+	std::unique_ptr<PreparedStatement> st;
+	const char query[] = 
+		"INSERT INTO `gw_groups` "		\
+		"(" 					\
+			"`tg_group_id`,"		\
+			"`username`," 			\
+			"`name`,"			\
+			"`link`,"			\
+			"`created_at`,"			\
+			"`updated_at`"			\
+		")" 					\
+		" VALUES (?, ?, ?, NULL, ?, NULL);";
+
+	std::unordered_map<int64_t, uint64_t>::const_iterator got =
+		groupTgToDb_.find(chat.id_);
+
+	if (!(got == groupTgToDb_.end())) {
+		ret = got->second;
+		goto out_no_move;
+	}
+
+	st = db_->prepare(query);
+	try {
+		char dateBuf[64];
+		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
+		st->bind(
+			PARAM_SINT((uint64_t)chat.id_),
+			PARAM_STRING("GNUWeeb"),
+			PARAM_STRING(chat.title_.c_str()),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+		st->execute();
+	} catch (std::string &err) {
+		goto do_fetch;
+	}
+
+	if ((ret = lastInsertId()))
+		goto out;
+
+do_fetch:
+	pr_debug("Fetching from DB (group)...");
+	st = db_->prepare("SELECT id FROM gw_groups WHERE tg_group_id = ?");
+	st->bind(
+		PARAM_SINT((uint64_t)chat.id_),
+		PARAM_END
+	);
+	st->execute();
+
+	if (auto row = st->fetch()) {
+		IS_OK(mysqlx_get_uint(row, 0, &ret), st->getStmt());
+		printf("fetched = %lu\n", ret);
+		if (ret)
+			goto out;
+	}
+
+out_no_move:
+	*chat_p = &chat;
+	return ret;
+
+out:
+	groupTgToDb_.insert_or_assign(chat.id_, ret);
+	groupMap_.insert_or_assign(chat.id_, std::move(chat));
+	*chat_p = &groupMap_[ret];
+	return ret;
+}
+
+
+uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
+				uint64_t db_group_id)
+{
+	uint64_t ret = 0;
+	const char query[] =
+		"INSERT INTO `gw_group_messages`"		\
+		"("						\
+			"`group_id`,"				\
+			"`user_id`,"				\
+			"`tg_msg_id`,"				\
+			"`reply_to_tg_msg_id`,"			\
+			"`msg_type`,"				\
+			"`has_edited_msg`,"			\
+			"`is_forwarded_msg`,"			\
+			"`created_at`,"				\
+			"`updated_at`"				\
+		") VALUES (?, ?, ?, ?, ?, '0', '0', ?, NULL);";
+
+	const char *msg_type = NULL;
+
+	switch (msg.content_->get_id()) {
+	case td_api::messageText::ID:
+		msg_type = "text";
+		break;
+	case td_api::messagePhoto::ID:
+		msg_type = "photo";
+		break;
+	case td_api::messageSticker::ID:
+		msg_type = "sticker";
+		break;
+	default:
+		std::cout << "Got default case, skipping...\n" << std::endl;
+		return 0;
+	}
+
+
+	char dateBuf[64];
+	const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
+
+	printf("Inserting db_user_id = %lu\n", db_user_id);
+	printf("Inserting db_group_id = %lu\n", db_group_id);
+	auto st = db_->prepare(query);
+	st->bind(
+		PARAM_UINT(db_group_id),
+		PARAM_UINT(db_user_id),
+		PARAM_UINT(msg.id_ >> 20u),
+		PARAM_UINT(msg.reply_to_message_id_ >> 20u),
+		PARAM_STRING(msg_type),
+		PARAM_STRING(dateNow),
+		PARAM_END
+	);
+	st->execute();
+
+	ret = lastInsertId();
+	switch (msg.content_->get_id()) {
+	case td_api::messageText::ID:
+		insertMsgDataText(ret, msg);
+		break;
+	}
+
+	return 0;
+}
+
+
+void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
+{
+	const char query[] =
+		"INSERT INTO `gw_group_message_data`"	\
+		"("					\
+			"`msg_id`,"			\
+			"`text`,"			\
+			"`text_entities`,"		\
+			"`file`,"			\
+			"`is_edited`,"			\
+			"`tg_date`,"			\
+			"`created_at`"			\
+		") VALUES (?, ?, NULL, NULL, '0', ?, ?);";
+
+	auto &msgText = static_cast<td_api::messageText &>(*msg.content_);
+	auto st = db_->prepare(query);
+	char dateBuf1[64], dateBuf2[64];
+	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
+	st->bind(
+		PARAM_UINT(db_msg_id),
+		PARAM_STRING(msgText.text_->text_.c_str()),
+		PARAM_STRING(msgDate),
+		PARAM_STRING(dateNow),
+		PARAM_END
+	);
+	st->execute();
 }
 
 

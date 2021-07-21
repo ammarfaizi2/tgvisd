@@ -118,6 +118,7 @@ td_api::object_ptr<RETURN> Td::send_query_sync(td_api::object_ptr<METHOD> method
 	const uint32_t warnAtCounter = 60;
 
 	auto callback = [&](td_api::object_ptr<td_api::Object> obj) {
+		printf("in sync...\n");
 
 		if (obj->get_id() == td_api::error::ID) {
 			auto err = td::move_tl_object_as<td_api::error>(obj);
@@ -137,6 +138,7 @@ td_api::object_ptr<RETURN> Td::send_query_sync(td_api::object_ptr<METHOD> method
 		cond.notify_one();
 	};
 
+	puts("In send_query_sync");
 	send_query(std::move(method), callback);
 
 	lock.lock();

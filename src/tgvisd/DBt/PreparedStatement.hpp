@@ -19,6 +19,8 @@ namespace tgvisd::DBt {
 class PreparedStatement
 {
 public:
+	~PreparedStatement(void);
+
 	inline PreparedStatement(mysqlx_session_t *sess, const char *query,
 				 uint32_t length = MYSQLX_NULL_TERMINATED):
 		sess_(sess)
@@ -40,10 +42,14 @@ public:
 
 	inline mysqlx_result_t *execute(void)
 	{
-		mysqlx_result_t *res;
-		res = mysqlx_execute(stmt_);
-		RESULT_CHECK(res, stmt_);
-		return res;
+		if (res_) {
+			mysqlx_free(res_);
+			res_ = nullptr;
+		}
+		pr_debug("Executing...");
+		res_ = mysqlx_execute(stmt_);
+		RESULT_CHECK(res_, stmt_);
+		return res_;
 	}
 
 
@@ -54,8 +60,23 @@ public:
 		return execute();
 	}
 
+	inline mysqlx_row_t *fetch(void)
+	{
+		return mysqlx_row_fetch_one(res_);
+	}
+
+	inline mysqlx_stmt_t *getStmt(void)
+	{
+		return stmt_;
+	}
+
+	inline mysqlx_result_t *getRes(void)
+	{
+		return res_;
+	}
 private:
 	mysqlx_session_t *sess_ = nullptr;
+	mysqlx_result_t *res_ = nullptr;
 	mysqlx_stmt_t *stmt_ = nullptr;
 };
 

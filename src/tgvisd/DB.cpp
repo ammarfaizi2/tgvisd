@@ -17,6 +17,13 @@ DB::DB(void)
 }
 
 
+DB::~DB(void)
+{
+	if (sess_)
+		mysqlx_session_close(sess_);
+}
+
+
 DB::DB(const char *host, uint16_t port, const char *user, const char *pass,
        const char *database)
 {
@@ -37,18 +44,18 @@ DB::DB(const char *host, uint16_t port, const char *user, const char *pass,
 bool DB::connect(void)
 {
 	mysqlx_session_t *sess;
-	mysqlx_error_t *err;
+	mysqlx_error_t *err = nullptr;
 
 	pr_debug("DB connecting...");
 	sess = mysqlx_get_session(host_, port_, user_, pass_, database_, &err);
 	if (!sess) {
-		char err[2048];
-		snprintf(err, sizeof(err),
+		char buf[2048];
+		snprintf(buf, sizeof(buf),
 			 "MySQL Error: %s (code: %d)",
 			 mysqlx_error_message(err),
 			 mysqlx_error_num(err));
 		mysqlx_free(err);
-		throw std::string(err);
+		throw std::string(buf);
 	}
 	sess_ = sess;
 	pr_debug("DB connected!");

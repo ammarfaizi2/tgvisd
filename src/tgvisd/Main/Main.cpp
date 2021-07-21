@@ -309,8 +309,9 @@ void Main::putExtraWorker(Worker *worker)
 
 static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
 {
+	(void)update;
+#if 0
 	Worker *worker;
-
 
 	if (unlikely(main->stopUpdate())) {
 		/*
@@ -370,6 +371,7 @@ out_work:
 		 * The worker is offline, let's give it a life.
 		 */
 		worker->spawn();
+#endif
 }
 
 
