@@ -62,7 +62,7 @@ public:
 	td_api::object_ptr<td_api::chat> getChat(int64_t chat_id);
 	td_api::object_ptr<td_api::chats> getChats(void);
 	td_api::object_ptr<td_api::messages> getChatHistory(int64_t chat_id);
-	td_api::object_ptr<td_api::file> downloadFile();
+	td_api::object_ptr<td_api::file> downloadFile(int32_t file_id);
 
 	void gatherChatEventLog(int64_t chat_id);
 	int64_t processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
@@ -86,7 +86,7 @@ private:
 	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
 	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
 	void _insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
-	bool trackEventId(int64_t event_id);	
+	bool trackEventId(int64_t event_id);
 };
 
 
@@ -155,7 +155,8 @@ Worker::Worker(tgvisd::Main::Main *main):
 td_api::object_ptr<td_api::chat> Worker::getChat(int64_t chat_id)
 {
 	return td_->send_query_sync<td_api::getChat, td_api::chat>(
-		td_api::make_object<td_api::getChat>(chat_id)
+		td_api::make_object<td_api::getChat>(chat_id),
+		30
 	);
 }
 
@@ -165,6 +166,7 @@ td_api::object_ptr<td_api::user> Worker::getUser(int64_t user_id)
 	printf("In getUser(): %ld\n", user_id);
 	return td_->send_query_sync<td_api::getUser, td_api::user>(
 		td_api::make_object<td_api::getUser>(user_id)
+		, 30
 	);
 }
 
@@ -234,21 +236,58 @@ td_api::object_ptr<td_api::user> Worker::getUser(int64_t user_id)
 // }
 
 
+td_api::object_ptr<td_api::file> Worker::downloadFile(int32_t file_id)
+{
+	int32_t prio = 32;
+	int32_t limit = 0;
+	int32_t offset = 0;
+	bool sync = true;
+	
+	return td_->send_query_sync<td_api::downloadFile, td_api::file>(
+		td_api::make_object<td_api::downloadFile>(
+			file_id,
+			prio,
+			limit,
+			offset,
+			sync
+		),
+		30
+	);
+}
+
+
+const char *dbhost, *dbuser, *dbpass, *dbname;
 
 void Worker::run(void)
 {
-	const char *dbpass = getenv("DB_PASS");
-	if (!dbpass)
+	dbhost = getenv("DB_HOST");
+	if (!dbhost) {
+		puts("Missing DB_HOST");
 		abort();
-
-	// sleep(2);
-	// gatherChatEventLog(-1001226735471); // Private Cloud
+	}
+	dbuser = getenv("DB_USER");
+	if (!dbuser) {
+		puts("Missing DB_USER");
+		abort();
+	}
+	dbpass = getenv("DB_PASS");
+	if (!dbpass) {
+		puts("Missing DB_PASS");
+		abort();
+	}
+	dbname = getenv("DB_NAME");
+	if (!dbname) {
+		puts("Missing DB_NAME");
+		abort();
+	}
+	
 
 	try {
 		sleep(2);
-		db_ = new tgvisd::DB("127.0.0.1", 0, "gw_telegram", dbpass, "gw_telegram");
+		db_ = new tgvisd::DB(dbhost, 0, dbuser, dbpass, dbname);
 		db_->connect();
-		gatherChatEventLog(-1001483770714); // GNU/Weeb
+		// gatherChatEventLog(-1001483770714); // GNU/Weeb
+		gatherChatEventLog(-1001226735471); // Private Cloud
 	} catch (std::string &err) {
 		std::cout << "Error: " << err << std::endl;
 		throw err;
@@ -283,8 +322,12 @@ void Worker::gatherChatEventLog(int64_t chat_id)
 				100,
 				nullptr,
 				std::move(user_ids)
-			)
+			),
+			30
 		);
+
+		if (!events)
+			break;
 		
 		min_ev = processChatEventLog(std::move(events));
 		pr_debug("min_ev = %ld", min_ev);
@@ -672,7 +715,29 @@ void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 
 void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 {
+	auto &msgPhoto = static_cast<td_api::messagePhoto &>(*msg.content_);
+	const char *text = msgPhoto.caption_->text_.c_str();
+	td_api::file *taken_file = nullptr;
 
+	auto &photos = msgPhoto.photo_->sizes_;
+	for (auto &photo: photos) {
+		auto &pfile = photo->photo_;
+		if (!taken_file) {
+			taken_file = pfile.get();
+		} else {
+			if (taken_file->size_ < pfile->size_)
+				taken_file = pfile.get();
+		}
+		std::cout << to_string(pfile) << std::endl;
+	}
+
+	if (!taken_file)
+		return;
+
+	pr_debug("Downloading file...");
+	auto f = downloadFile(taken_file->id_);
+	pr_debug("Downloaded OK!");
+	std::cout << to_string(f) << std::endl;
 }
 
 

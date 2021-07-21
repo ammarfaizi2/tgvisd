@@ -1,0 +1,7 @@
+
+
+export DB_HOST="127.0.0.1"
+export DB_USER="gw_telegram"
+export DB_PASS="gw_telegram"
+export DB_NAME="gw_telegram"
+build/tgvisd accounts.txt
