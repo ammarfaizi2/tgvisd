@@ -1,14 +1,13 @@
--- Adminer 4.8.0 MySQL 8.0.25-0ubuntu0.21.04.1 dump
+-- Adminer 4.8.1 MySQL 8.0.25-0ubuntu0.20.04.1 dump
 
 SET NAMES utf8;
 SET time_zone = '+00:00';
 SET foreign_key_checks = 0;
 SET sql_mode = 'NO_AUTO_VALUE_ON_ZERO';
 
-USE `gw_telegram`;
-
 SET NAMES utf8mb4;
 
+DROP TABLE IF EXISTS `gw_files`;
 CREATE TABLE `gw_files` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `tg_file_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
@@ -37,6 +36,7 @@ CREATE TABLE `gw_files` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
+DROP TABLE IF EXISTS `gw_group_message_data`;
 CREATE TABLE `gw_group_message_data` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `msg_id` bigint unsigned NOT NULL,
@@ -58,6 +58,7 @@ CREATE TABLE `gw_group_message_data` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
+DROP TABLE IF EXISTS `gw_group_messages`;
 CREATE TABLE `gw_group_messages` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `group_id` bigint unsigned NOT NULL,
@@ -84,6 +85,7 @@ CREATE TABLE `gw_group_messages` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
+DROP TABLE IF EXISTS `gw_groups`;
 CREATE TABLE `gw_groups` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `tg_group_id` bigint NOT NULL,
@@ -102,6 +104,7 @@ CREATE TABLE `gw_groups` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
+DROP TABLE IF EXISTS `gw_users`;
 CREATE TABLE `gw_users` (
   `id` bigint unsigned NOT NULL AUTO_INCREMENT,
   `tg_user_id` bigint unsigned NOT NULL,
@@ -122,10 +125,31 @@ CREATE TABLE `gw_users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
+DROP TABLE IF EXISTS `track_event_id`;
 CREATE TABLE `track_event_id` (
   `id` bigint unsigned NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
--- 2021-07-21 09:29:10
+CREATE VIEW v_msg_group_simple AS SELECT
+  a.tg_user_id,
+  b.tg_msg_id,
+  CONCAT(
+    a.first_name,
+    IF (a.last_name != '' AND a.last_name IS NOT NULL,
+      CONCAT(' ', a.last_name),
+      ''
+    )
+  ) as name,
+  SUBSTR(c.`text`, 1, 30) AS text_in_msg,
+  b.msg_type,
+  c.tg_date
+FROM gw_users AS a 
+INNER JOIN gw_group_messages AS b ON a.id = b.user_id
+INNER JOIN gw_group_message_data AS c ON b.id = c.msg_id
+INNER JOIN gw_groups AS d ON d.id = b.group_id
+ORDER BY c.tg_date;
+
+
+-- 2021-07-21 16:00:11
