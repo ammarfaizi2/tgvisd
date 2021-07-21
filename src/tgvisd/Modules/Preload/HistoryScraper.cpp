@@ -1054,7 +1054,6 @@ void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 	const char *text_entities = NULL;
 	auto &text_obj = msgDoc.caption_;
 	if (text_obj->entities_.size() > 0) {
-		const char *text_entities;
 		en = to_string(text_obj->entities_);
 		text_entities = en.c_str();
 	}
@@ -1082,7 +1081,6 @@ void Worker::_insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
 	const char *text_entities = NULL;
 	auto &text_obj = msgVideo.caption_;
 	if (text_obj->entities_.size() > 0) {
-		const char *text_entities;
 		en = to_string(text_obj->entities_);
 		text_entities = en.c_str();
 	}
@@ -1110,7 +1108,6 @@ void Worker::_insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
 	const char *text_entities = NULL;
 	auto &text_obj = msgAnim.caption_;
 	if (text_obj->entities_.size() > 0) {
-		const char *text_entities;
 		en = to_string(text_obj->entities_);
 		text_entities = en.c_str();
 	}
@@ -1195,7 +1192,6 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	const char *text_entities = NULL;
 	auto &text_obj = msgPhoto.caption_;
 	if (text_obj->entities_.size() > 0) {
-		const char *text_entities;
 		en = to_string(text_obj->entities_);
 		text_entities = en.c_str();
 	}
