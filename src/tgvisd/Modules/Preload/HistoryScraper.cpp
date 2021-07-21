@@ -91,6 +91,8 @@ private:
 	std::unordered_map<std::uint64_t, td_api::user> userMap_;
 	std::unordered_map<std::int64_t, td_api::chat> groupMap_;
 
+	void saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd);
+
 	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
 	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
 	void _insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
@@ -103,7 +105,8 @@ private:
 	void insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
 	void _insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
 	void insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
-				 const char *text, td_api::file &file);
+				 const char *text, const char *text_entities,
+				 td_api::file &file);
 	bool trackEventId(int64_t event_id);
 };
 
@@ -604,6 +607,107 @@ out:
 }
 
 
+void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd)
+{
+	const char query[] =
+		"INSERT INTO `gw_group_message_forward` "	\
+		"("						\
+			"`msg_id`,"				\
+			"`origin_type`,"			\
+			"`orig_date`,"				\
+			"`pas_at`,"				\
+			"`orig_id`,"				\
+			"`origin_text`,"			\
+			"`from_chat_id`,"			\
+			"`from_msg_id`"				\
+		") VALUES (?, ?, ?, ?, ?, ?, ?);";
+
+	char dateBuf[64];
+	const char *orig_text, *orig_type, *pas;
+	const char *msgDate = getDateByUnixTM(fwd.date_, dateBuf, sizeof(dateBuf));
+
+	pas = fwd.public_service_announcement_type_.c_str();
+	switch (fwd.origin_->get_id()) {
+	case td_api::messageForwardOriginUser::ID: {
+		auto st = db_->prepare(query);
+		auto &o = static_cast<td_api::messageForwardOriginUser &>
+			(*fwd.origin_);
+		orig_text = "";
+		orig_type = "user";
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(orig_type),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(pas),
+			PARAM_UINT((uint64_t)o.sender_user_id_),
+			PARAM_STRING(orig_text),
+			PARAM_UINT(fwd.from_chat_id_),
+			PARAM_UINT(fwd.from_message_id_),
+			PARAM_END
+		);
+		break;
+	}
+	case td_api::messageForwardOriginHiddenUser::ID: {
+		auto st = db_->prepare(query);
+		auto &o = static_cast<td_api::messageForwardOriginHiddenUser &>
+			(*fwd.origin_);
+		orig_text = o.sender_name_.c_str();
+		orig_type = "hidden_user";
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(orig_type),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(pas),
+			PARAM_UINT(0),
+			PARAM_STRING(orig_text),
+			PARAM_UINT(fwd.from_chat_id_),
+			PARAM_UINT(fwd.from_message_id_),
+			PARAM_END
+		);
+		break;
+	}
+	case td_api::messageForwardOriginChannel::ID: {
+		auto st = db_->prepare(query);
+		auto &o = static_cast<td_api::messageForwardOriginChannel &>
+			(*fwd.origin_);
+		orig_text = o.author_signature_.c_str();
+		orig_type = "channel";
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(orig_type),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(pas),
+			PARAM_UINT(0),
+			PARAM_STRING(orig_text),
+			PARAM_UINT(fwd.from_chat_id_),
+			PARAM_UINT(fwd.from_message_id_),
+			PARAM_END
+		);
+		break;
+	}
+	case td_api::messageForwardOriginChat::ID: {
+		auto st = db_->prepare(query);
+		auto &o = static_cast<td_api::messageForwardOriginChat &>
+			(*fwd.origin_);
+		orig_text = o.author_signature_.c_str();
+		orig_type = "chat";
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(orig_type),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(pas),
+			PARAM_UINT((uint64_t)o.sender_chat_id_),
+			PARAM_STRING(orig_text),
+			PARAM_UINT(fwd.from_chat_id_),
+			PARAM_UINT(fwd.from_message_id_),
+			PARAM_END
+		);
+		break;
+	}
+	}
+}
+
+
 uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 				uint64_t db_group_id)
 {
@@ -620,7 +724,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 			"`is_forwarded_msg`,"			\
 			"`created_at`,"				\
 			"`updated_at`"				\
-		") VALUES (?, ?, ?, ?, ?, '0', '0', ?, NULL);";
+		") VALUES (?, ?, ?, ?, ?, '0', ?, ?, NULL);";
 
 	const char *msg_type = NULL;
 
@@ -628,6 +732,9 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	case td_api::messageText::ID:
 		msg_type = "text";
 		break;
+
+
+	/* May have files */
 	case td_api::messagePhoto::ID:
 		msg_type = "photo";
 		break;
@@ -643,11 +750,22 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	case td_api::messageDocument::ID:
 		msg_type = "document";
 		break;
+	case td_api::messageAudio::ID:
+		msg_type = "audio";
+		break;
+
+
+	/* Event */
+	case td_api::messageChatJoinByLink::ID:
+		msg_type = "join";
+		break;
+
 	default:
 		std::cout << "Got default case, skipping...\n" << std::endl;
 		return 0;
 	}
 
+	const char *is_forwarded_msg = msg.forward_info_ ? "1" : "0";
 
 	printf("Saving %s\n", msg_type);
 	char dateBuf[64];
@@ -659,11 +777,15 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 		PARAM_UINT(msg.id_ >> 20u),
 		PARAM_UINT(msg.reply_to_message_id_ >> 20u),
 		PARAM_STRING(msg_type),
+		PARAM_STRING(is_forwarded_msg),
 		PARAM_STRING(dateNow),
 		PARAM_END
 	);
 
 	ret = lastInsertId();
+	if (msg.forward_info_)
+		saveForwardInfo(ret, *msg.forward_info_);
+
 	switch (msg.content_->get_id()) {
 	case td_api::messageText::ID:
 		insertMsgDataText(ret, msg);
@@ -701,20 +823,36 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 			"`is_edited`,"			\
 			"`tg_date`,"			\
 			"`created_at`"			\
-		") VALUES (?, ?, NULL, NULL, '0', ?, ?);";
+		") VALUES (?, ?, ?, NULL, '0', ?, ?);";
 
 	auto &msgText = static_cast<td_api::messageText &>(*msg.content_);
 	auto st = db_->prepare(query);
 	char dateBuf1[64], dateBuf2[64];
 	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
 	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-	st->bind(
-		PARAM_UINT(db_msg_id),
-		PARAM_STRING(msgText.text_->text_.c_str()),
-		PARAM_STRING(msgDate),
-		PARAM_STRING(dateNow),
-		PARAM_END
-	);
+
+	if (msgText.text_->entities_.size() > 0) {
+		const char *text_entities;
+		std::string en = to_string(msgText.text_->entities_);
+		text_entities = en.c_str();
+		st->bind(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(msgText.text_->text_.c_str()),
+			PARAM_STRING(text_entities),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	} else {
+		st->bind(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(msgText.text_->text_.c_str()),
+			PARAM_NULL(),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	}
 	st->execute();
 }
 
@@ -911,7 +1049,17 @@ void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 {
 	auto &msgDoc = static_cast<td_api::messageDocument &>(*msg.content_);
 	const char *text = msgDoc.caption_->text_.c_str();
-	insertMsgData__file(db_msg_id, msg, text, *msgDoc.document_->document_);
+
+	std::string en;
+	const char *text_entities = NULL;
+	auto &text_obj = msgDoc.caption_;
+	if (text_obj->entities_.size() > 0) {
+		const char *text_entities;
+		en = to_string(text_obj->entities_);
+		text_entities = en.c_str();
+	}
+	insertMsgData__file(db_msg_id, msg, text, text_entities,
+			    *msgDoc.document_->document_);
 }
 
 
@@ -929,7 +1077,17 @@ void Worker::_insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
 {
 	auto &msgVideo = static_cast<td_api::messageVideo &>(*msg.content_);
 	const char *text = msgVideo.caption_->text_.c_str();
-	insertMsgData__file(db_msg_id, msg, text, *msgVideo.video_->video_);
+
+	std::string en;
+	const char *text_entities = NULL;
+	auto &text_obj = msgVideo.caption_;
+	if (text_obj->entities_.size() > 0) {
+		const char *text_entities;
+		en = to_string(text_obj->entities_);
+		text_entities = en.c_str();
+	}
+	insertMsgData__file(db_msg_id, msg, text, text_entities,
+			    *msgVideo.video_->video_);
 }
 
 
@@ -947,7 +1105,17 @@ void Worker::_insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
 {
 	auto &msgAnim = static_cast<td_api::messageAnimation &>(*msg.content_);
 	const char *text = msgAnim.caption_->text_.c_str();
-	insertMsgData__file(db_msg_id, msg, text, *msgAnim.animation_->animation_);
+
+	std::string en;
+	const char *text_entities = NULL;
+	auto &text_obj = msgAnim.caption_;
+	if (text_obj->entities_.size() > 0) {
+		const char *text_entities;
+		en = to_string(text_obj->entities_);
+		text_entities = en.c_str();
+	}
+	insertMsgData__file(db_msg_id, msg, text, text_entities, 
+			    *msgAnim.animation_->animation_);
 }
 
 
@@ -965,7 +1133,8 @@ void Worker::_insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
 {
 	auto &msgSticker = static_cast<td_api::messageSticker &>(*msg.content_);
 	const char *text = msgSticker.sticker_->emoji_.c_str();
-	insertMsgData__file(db_msg_id, msg, text, *msgSticker.sticker_->sticker_);
+	insertMsgData__file(db_msg_id, msg, text, NULL,
+			    *msgSticker.sticker_->sticker_);
 }
 
 
@@ -1022,12 +1191,21 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 	if (!taken_file)
 		return;
 
-	insertMsgData__file(db_msg_id, msg, text, *taken_file);
+	std::string en;
+	const char *text_entities = NULL;
+	auto &text_obj = msgPhoto.caption_;
+	if (text_obj->entities_.size() > 0) {
+		const char *text_entities;
+		en = to_string(text_obj->entities_);
+		text_entities = en.c_str();
+	}
+	insertMsgData__file(db_msg_id, msg, text, text_entities, *taken_file);
 }
 
 
 void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
-				 const char *text, td_api::file &file)
+				 const char *text, const char *text_entities,
+				 td_api::file &file)
 {
 	// struct db_pool *dbp = getWrkDb();
 	// if (!dbp) {
@@ -1047,21 +1225,34 @@ void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 			"`is_edited`,"			\
 			"`tg_date`,"			\
 			"`created_at`"			\
-		") VALUES (?, ?, NULL, ?, '0', ?, ?);";
+		") VALUES (?, ?, ?, ?, '0', ?, ?);";
 	auto st = db_->prepare(query);
 	char dateBuf1[64], dateBuf2[64];
 	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
 	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
-	st->execute(
-		PARAM_UINT(db_msg_id),
-		PARAM_STRING(text),
-		PARAM_UINT(file_id),
-		PARAM_STRING(msgDate),
-		PARAM_STRING(dateNow),
-		PARAM_END
-	);
+
+	if (text_entities) {
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(text),
+			PARAM_STRING(text_entities),
+			PARAM_UINT(file_id),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	} else {
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(text),
+			PARAM_NULL(),
+			PARAM_UINT(file_id),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	}
 	// putWrkDb(dbp);
 }
-
 
 } /* namespace tgvisd::Modules::Preload */
