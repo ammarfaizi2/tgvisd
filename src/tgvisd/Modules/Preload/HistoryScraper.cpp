@@ -19,6 +19,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <atomic>
+#include <unistd.h>
 #include <unordered_map>
 #include <condition_variable>
 
@@ -93,6 +94,8 @@ private:
 	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
 	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
 	void _insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
+	void insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg);
+	void _insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg);
 	bool trackEventId(int64_t event_id);
 };
 
@@ -299,8 +302,8 @@ void Worker::run(void)
 	try {
 		sleep(2);
 		db_ = createDB();
-		// gatherChatEventLog(-1001483770714); // GNU/Weeb
-		gatherChatEventLog(-1001226735471); // Private Cloud
+		gatherChatEventLog(-1001483770714); // GNU/Weeb
+		// gatherChatEventLog(-1001226735471); // Private Cloud
 	} catch (std::string &err) {
 		std::cout << "Error: " << err << std::endl;
 		throw err;
@@ -655,6 +658,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	case td_api::messageVideo::ID:
 		break;
 	case td_api::messageSticker::ID:
+		insertMsgDataSticker(ret, msg);
 		break;
 	}
 
@@ -712,7 +716,7 @@ uint64_t Worker::resolveFile(tgvisd::DB *db, td_api::file &file)
 		return ret;
 	}
 	pr_debug("Downloaded OK!");
-	std::cout << to_string(f) << std::endl;
+	// std::cout << to_string(f) << std::endl;
 
 	auto &loc = f->local_;
 	if (loc->path_ == "") {
@@ -730,8 +734,30 @@ uint64_t Worker::resolveFile(tgvisd::DB *db, td_api::file &file)
 		return ret;
 	}
 
+	char new_fn[1024];
+	char md5_dg[sizeof(md5_buf) * 2 + 1] = {0};
+	char sha1_dg[sizeof(sha1_buf) * 2 + 1] = {0};
 	const char *file_ext = get_filename_ext(loc->path_.c_str());
-	std::cout << "File ex: " << file_ext << std::endl;
+
+	make_digest_ex(md5_dg, md5_buf, sizeof(md5_buf));
+	make_digest_ex(sha1_dg, sha1_buf, sizeof(sha1_buf));
+
+	// std::cout << "File ex: " << file_ext << std::endl;
+	// std::cout << "md5 : " << md5_dg << std::endl;
+	// std::cout << "sha1: " << sha1_dg << std::endl;
+	// std::cout << "path: " << loc->path_.c_str() << std::endl;
+
+	snprintf(new_fn, sizeof(new_fn),
+		 "storage/files/%s_%s.%s", md5_dg, sha1_dg, file_ext);
+
+	pr_debug("newp: %s", new_fn);
+
+	if (rename(loc->path_.c_str(), new_fn)) {
+		pr_debug("rename(): %s", strerror(errno));
+	}
+	if (link(new_fn, loc->path_.c_str())) {
+		pr_debug("link(): %s", strerror(errno));
+	}
 
 	try {
 		const char query[] =
@@ -847,9 +873,70 @@ static void wrk_wait(void)
 }
 
 
+void Worker::insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
+{
+	try {
+		this->_insertMsgDataSticker(db_msg_id, msg);
+	} catch (std::string &err) {
+		std::cout << err << std::endl;
+	}
+	return;
+}
+
+
+void Worker::_insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
+{
+	uint64_t file_id;
+	auto &msgSticker = static_cast<td_api::messageSticker &>(*msg.content_);
+	const char *text = msgSticker.sticker_->emoji_.c_str();
+
+	// struct db_pool *dbp = getWrkDb();
+	// if (!dbp) {
+	// 	puts("DB pool is full!");
+	// 	abort();
+	// }
+	auto db = db_; // dbp->db;
+	file_id = resolveFile(db, *msgSticker.sticker_->sticker_);
+
+	{
+		const char query[] =
+			"INSERT INTO `gw_group_message_data`"	\
+			"("					\
+				"`msg_id`,"			\
+				"`text`,"			\
+				"`text_entities`,"		\
+				"`file`,"			\
+				"`is_edited`,"			\
+				"`tg_date`,"			\
+				"`created_at`"			\
+			") VALUES (?, ?, NULL, ?, '0', ?, ?);";
+		auto st = db_->prepare(query);
+		char dateBuf1[64], dateBuf2[64];
+		const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+		const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
+		st->execute(
+			PARAM_UINT(db_msg_id),
+			PARAM_STRING(text),
+			PARAM_UINT(file_id),
+			PARAM_STRING(msgDate),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	}
+	// putWrkDb(dbp);
+}
+
 
 void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 {
+	try {
+		this->_insertMsgDataPhoto(db_msg_id, msg);
+	} catch (std::string &err) {
+		std::cout << err << std::endl;
+	}
+	return;
+
+
 	wrk_wait();
 	std::thread worker([this, db_msg_id, &msg](void){
 		atomic_fetch_add(&wrk_online, 1);
@@ -888,18 +975,18 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 			if (taken_file->size_ < pfile->size_)
 				taken_file = pfile.get();
 		}
-		std::cout << to_string(pfile) << std::endl;
+		// std::cout << to_string(pfile) << std::endl;
 	}
 
 	if (!taken_file)
 		return;
 
-	struct db_pool *dbp = getWrkDb();
-	if (!dbp) {
-		puts("DB pool is full!");
-		abort();
-	}
-	auto db = dbp->db;
+	// struct db_pool *dbp = getWrkDb();
+	// if (!dbp) {
+	// 	puts("DB pool is full!");
+	// 	abort();
+	// }
+	auto db = db_; // dbp->db;
 	file_id = resolveFile(db, *taken_file);
 
 	{
@@ -927,7 +1014,7 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 			PARAM_END
 		);
 	}
-	putWrkDb(dbp);
+	// putWrkDb(dbp);
 }
 
 
