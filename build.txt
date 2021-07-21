@@ -1,4 +1,3 @@
 
-
 cmake -DCMAKE_BUILD_TYPE=Release -DTd_DIR=$(pwd)/../td/lib/cmake/Td ..
 cmake --build . --target install --parallel 2 -j4
