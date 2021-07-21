@@ -107,6 +107,8 @@ private:
 	void insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 				 const char *text, const char *text_entities,
 				 td_api::file &file);
+	void insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg);
+	void _insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg);
 	bool trackEventId(int64_t event_id);
 };
 
@@ -805,6 +807,9 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	case td_api::messageDocument::ID:
 		insertMsgDataDocument(ret, msg);
 		break;
+	case td_api::messageAudio::ID:
+		insertMsgDataAudio(ret, msg);
+		break;
 	}
 
 	return 0;
@@ -1059,6 +1064,33 @@ void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 	}
 	insertMsgData__file(db_msg_id, msg, text, text_entities,
 			    *msgDoc.document_->document_);
+}
+
+
+void Worker::insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg)
+{
+	try {
+		this->_insertMsgDataAudio(db_msg_id, msg);
+	} catch (std::string &err) {
+		std::cout << err << std::endl;
+	}
+}
+
+
+void Worker::_insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg)
+{
+	auto &msgAudio = static_cast<td_api::messageAudio &>(*msg.content_);
+	const char *text = msgAudio.caption_->text_.c_str();
+
+	std::string en;
+	const char *text_entities = NULL;
+	auto &text_obj = msgAudio.caption_;
+	if (text_obj->entities_.size() > 0) {
+		en = to_string(text_obj->entities_);
+		text_entities = en.c_str();
+	}
+	insertMsgData__file(db_msg_id, msg, text, text_entities,
+			    *msgAudio.audio_->audio_);
 }
 
 
