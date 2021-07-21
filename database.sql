@@ -1,4 +1,4 @@
--- Adminer 4.8.1 MySQL 8.0.25-0ubuntu0.20.04.1 dump
+-- Adminer 4.7.6 MySQL dump
 
 SET NAMES utf8;
 SET time_zone = '+00:00';
@@ -55,6 +55,28 @@ CREATE TABLE `gw_group_message_data` (
   FULLTEXT KEY `text` (`text`),
   CONSTRAINT `gw_group_message_data_ibfk_1` FOREIGN KEY (`msg_id`) REFERENCES `gw_group_messages` (`id`) ON DELETE RESTRICT,
   CONSTRAINT `gw_group_message_data_ibfk_2` FOREIGN KEY (`file`) REFERENCES `gw_files` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
+
+
+DROP TABLE IF EXISTS `gw_group_message_forward`;
+CREATE TABLE `gw_group_message_forward` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `msg_id` bigint unsigned NOT NULL,
+  `origin_type` enum('channel','chat','hidden_user','user') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `orig_date` date DEFAULT NULL,
+  `pas_at` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci COMMENT 'public_service_announcement_type_ The type of a public service announcement for the forwarded message. https://core.telegram.org/tdlib/docs/classtd_1_1td__api_1_1message_forward_info.html#aca7885f90a22bfba54b42c4a1ffc7b47',
+  `orig_id` bigint unsigned DEFAULT NULL,
+  `origin_text` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci DEFAULT NULL,
+  `from_chat_id` bigint unsigned NOT NULL,
+  `from_msg_id` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `orig_date` (`orig_date`),
+  KEY `from_chat_id` (`from_chat_id`),
+  KEY `from_msg_id` (`from_msg_id`),
+  KEY `orig_user_id` (`orig_id`),
+  KEY `origin_text` (`origin_text`),
+  KEY `msg_id` (`msg_id`),
+  CONSTRAINT `gw_group_message_forward_ibfk_1` FOREIGN KEY (`msg_id`) REFERENCES `gw_group_messages` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
@@ -132,24 +154,4 @@ CREATE TABLE `track_event_id` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_520_ci;
 
 
-CREATE VIEW v_msg_group_simple AS SELECT
-  a.tg_user_id,
-  b.tg_msg_id,
-  CONCAT(
-    a.first_name,
-    IF (a.last_name != '' AND a.last_name IS NOT NULL,
-      CONCAT(' ', a.last_name),
-      ''
-    )
-  ) as name,
-  SUBSTR(c.`text`, 1, 30) AS text_in_msg,
-  b.msg_type,
-  c.tg_date
-FROM gw_users AS a 
-INNER JOIN gw_group_messages AS b ON a.id = b.user_id
-INNER JOIN gw_group_message_data AS c ON b.id = c.msg_id
-INNER JOIN gw_groups AS d ON d.id = b.group_id
-ORDER BY c.tg_date;
-
-
--- 2021-07-21 16:00:11
+-- 2021-07-21 22:31:14

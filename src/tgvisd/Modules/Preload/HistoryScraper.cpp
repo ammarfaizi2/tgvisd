@@ -622,7 +622,7 @@ void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd
 			"`origin_text`,"			\
 			"`from_chat_id`,"			\
 			"`from_msg_id`"				\
-		") VALUES (?, ?, ?, ?, ?, ?, ?);";
+		") VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
 
 	char dateBuf[64];
 	const char *orig_text, *orig_type, *pas;
@@ -759,7 +759,10 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 
 	/* Event */
 	case td_api::messageChatJoinByLink::ID:
-		msg_type = "join";
+		msg_type = "new_member_join_link";
+		break;
+	case td_api::messageChatAddMembers::ID:
+		msg_type = "new_member";
 		break;
 
 	default:
