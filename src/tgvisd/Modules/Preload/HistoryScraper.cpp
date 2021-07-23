@@ -1336,6 +1336,7 @@ void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 			PARAM_STRING(text),
 			PARAM_NULL(),
 			PARAM_UINT(file_id),
+			PARAM_STRING(is_edited ? "1" : "0"),
 			PARAM_STRING(msgDate),
 			PARAM_STRING(dateNow),
 			PARAM_END
