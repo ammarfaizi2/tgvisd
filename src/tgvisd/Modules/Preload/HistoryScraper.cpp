@@ -73,12 +73,12 @@ public:
 
 	void gatherChatEventLog(int64_t chat_id);
 	int64_t processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
-	void processMessage(td_api::message &msg);
+	void processMessage(td_api::message &msg, bool is_edited);
 
 	uint64_t resolveUser(td_api::user &user, td_api::user **user_p);
 	int64_t resolveGroup(td_api::chat &chat, td_api::chat **chat_p);
 	uint64_t resolveMessage(td_api::message &msg, uint64_t db_user_id,
-				uint64_t db_group_id);
+				uint64_t db_group_id, bool is_edited);
 	uint64_t resolveFile(tgvisd::DB *db, td_api::file &file);
 	uint64_t lastInsertId(void);
 private:
@@ -93,23 +93,30 @@ private:
 
 	void saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd);
 
-	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg);
-	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg);
-	void insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg);
-	void insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg);
-	void insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg);
-	void insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg);
+	void insertMsgData(uint64_t db_msg_id, td_api::message &msg,
+			   bool is_edited);
+	void insertMsgDataText(uint64_t db_msg_id, td_api::message &msg,
+			       bool is_edited);
+	void insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited);
+	void insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg,
+				  bool is_edited);
+	void insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited);
+	void insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg,
+				    bool is_edited);
+	void insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg,
+				   bool is_edited);
+	void insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited);
 	void insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 				 const char *text, const char *text_entities,
-				 td_api::file &file);
-	void insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg);
-	void _insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg);
+				 td_api::file &file, bool is_edited);
 	bool trackEventId(int64_t event_id);
+	uint64_t getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
+				    bool *has_edited_msg);
+
+	void setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id);
 };
 
 
@@ -411,14 +418,14 @@ int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> event
                 }
 
 		auto &msg = static_cast<td_api::chatEventMessageDeleted &>(*ev->action_).message_;
-		processMessage(*msg);
+		processMessage(*msg, false);
 		db_->prepare("COMMIT")->execute();
 	}
 	return min_event;
 }
 
 
-void Worker::processMessage(td_api::message &msg)
+void Worker::processMessage(td_api::message &msg, bool is_edited)
 {
 	printf("In processMessage\n");
 	if (msg.sender_->get_id() != td_api::messageSenderUser::ID)
@@ -439,7 +446,7 @@ void Worker::processMessage(td_api::message &msg)
 	uint64_t db_group_id = resolveGroup(*chat_, &chat);
 	// printf("db_user_id = %lu\n", db_user_id);
 	// printf("db_group_id = %lu\n", db_group_id);
-	resolveMessage(msg, db_user_id, db_group_id);
+	resolveMessage(msg, db_user_id, db_group_id, is_edited);
 }
 
 
@@ -720,10 +727,64 @@ void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd
 }
 
 
-uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
-				uint64_t db_group_id)
+void Worker::setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
 {
+	auto st = db_->prepare(
+		"UPDATE gw_group_messages SET has_edited_msg = '1' WHERE " \
+		"id = ? AND group_id = ? LIMIT 1"
+	);
+	st->execute(
+		PARAM_UINT(db_msg_id),
+		PARAM_SINT(db_group_id),
+		PARAM_END
+	);
+}
+
+
+uint64_t Worker::getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
+				    bool *has_edited_msg)
+{
+	auto st = db_->prepare(
+		"SELECT a.id, a.has_edited_msg FROM gw_group_messages AS a " \
+		"INNER JOIN gw_groups AS b ON b.id = a.group_id WHERE " \
+		"a.tg_msg_id = ? AND b.tg_group_id = ?"
+	);
+	st->execute(
+		PARAM_UINT(tg_msg_id),
+		PARAM_SINT(chat_id),
+		PARAM_END
+	);
+	auto row = st->fetch();
+	if (row) {
+		uint64_t ret = 0;
+		IS_OK(mysqlx_get_uint(row, 0, &ret), st->getStmt());
+
+		if (has_edited_msg) {
+			size_t len = 5;
+			char buffer[5];
+			IS_OK(mysqlx_get_bytes(row, 1, 0, buffer, &len),
+			      st->getStmt());
+			*has_edited_msg = (*buffer == 1);
+		}
+
+		return ret;
+	}
+
+	if (has_edited_msg)
+		*has_edited_msg = false;
+
+	return 0;
+}
+
+
+uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
+				uint64_t db_group_id, bool is_edited)
+{
+	int64_t tg_group_id;
+	uint64_t tg_msg_id;
 	uint64_t ret = 0;
+	uint64_t db_msg_id;
+	bool has_edited_msg = false;
 	const char query[] =
 		"INSERT INTO `gw_group_messages`"		\
 		"("						\
@@ -773,60 +834,78 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 		break;
 
 	default:
-		std::cout << "Got default case, skipping...\n" << std::endl;
+		pr_debug("Got default case, skipping...");
 		return 0;
 	}
 
-	const char *is_forwarded_msg = msg.forward_info_ ? "1" : "0";
+	tg_group_id = (int64_t)msg.chat_id_;
+	tg_msg_id = (uint64_t)msg.id_;
+	db_msg_id = getDBMsgIdIfExists(tg_msg_id, tg_group_id, &has_edited_msg);
+	if (db_msg_id != 0) {
+		if (has_edited_msg)
+			setHasEditedToTrue(db_msg_id, db_group_id);
+		goto insert_msg_data;
+	}
 
-	printf("Saving %s\n", msg_type);
-	char dateBuf[64];
-	const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
-	auto st = db_->prepare(query);
-	st->execute(
-		PARAM_UINT(db_group_id),
-		PARAM_UINT(db_user_id),
-		PARAM_UINT(msg.id_ >> 20u),
-		PARAM_UINT(msg.reply_to_message_id_ >> 20u),
-		PARAM_STRING(msg_type),
-		PARAM_STRING(is_forwarded_msg),
-		PARAM_STRING(dateNow),
-		PARAM_END
-	);
+	pr_debug("Saving msg_type: %s", msg_type);
 
-	ret = lastInsertId();
+	{
+		char dateBuf[64];
+		const char *is_forwarded_msg = msg.forward_info_ ? "1" : "0";
+		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
+		auto st = db_->prepare(query);
+		st->execute(
+			PARAM_UINT(db_group_id),
+			PARAM_UINT(db_user_id),
+			PARAM_UINT(msg.id_ >> 20u),
+			PARAM_UINT(msg.reply_to_message_id_ >> 20u),
+			PARAM_STRING(msg_type),
+			PARAM_STRING(is_forwarded_msg),
+			PARAM_STRING(dateNow),
+			PARAM_END
+		);
+	}
+
+	db_msg_id = lastInsertId();
 	if (msg.forward_info_)
 		saveForwardInfo(ret, *msg.forward_info_);
 
-	switch (msg.content_->get_id()) {
-	case td_api::messageText::ID:
-		insertMsgDataText(ret, msg);
-		break;
-	case td_api::messagePhoto::ID:
-		insertMsgDataPhoto(ret, msg);
-		break;
-	case td_api::messageVideo::ID:
-		insertMsgDataVideo(ret, msg);
-		break;
-	case td_api::messageSticker::ID:
-		insertMsgDataSticker(ret, msg);
-		break;
-	case td_api::messageAnimation::ID:
-		insertMsgDataAnimation(ret, msg);
-		break;
-	case td_api::messageDocument::ID:
-		insertMsgDataDocument(ret, msg);
-		break;
-	case td_api::messageAudio::ID:
-		insertMsgDataAudio(ret, msg);
-		break;
-	}
-
+insert_msg_data:
+	insertMsgData(db_msg_id, msg, is_edited);
 	return 0;
 }
 
+void Worker::insertMsgData(uint64_t db_msg_id, td_api::message &msg,
+			   bool is_edited)
+{
+	switch (msg.content_->get_id()) {
+	case td_api::messageText::ID:
+		insertMsgDataText(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messagePhoto::ID:
+		insertMsgDataPhoto(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messageVideo::ID:
+		insertMsgDataVideo(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messageSticker::ID:
+		insertMsgDataSticker(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messageAnimation::ID:
+		insertMsgDataAnimation(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messageDocument::ID:
+		insertMsgDataDocument(db_msg_id, msg, is_edited);
+		break;
+	case td_api::messageAudio::ID:
+		insertMsgDataAudio(db_msg_id, msg, is_edited);
+		break;
+	}	
+}
 
-void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
+
+void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg,
+			       bool is_edited)
 {
 	const char query[] =
 		"INSERT INTO `gw_group_message_data`"	\
@@ -838,7 +917,7 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 			"`is_edited`,"			\
 			"`tg_date`,"			\
 			"`created_at`"			\
-		") VALUES (?, ?, ?, NULL, '0', ?, ?);";
+		") VALUES (?, ?, ?, NULL, ?, ?, ?);";
 
 	auto &msgText = static_cast<td_api::messageText &>(*msg.content_);
 	auto st = db_->prepare(query);
@@ -854,6 +933,7 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 			PARAM_UINT(db_msg_id),
 			PARAM_STRING(msgText.text_->text_.c_str()),
 			PARAM_STRING(text_entities),
+			PARAM_STRING(is_edited ? "1" : "0"),
 			PARAM_STRING(msgDate),
 			PARAM_STRING(dateNow),
 			PARAM_END
@@ -863,6 +943,7 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg)
 			PARAM_UINT(db_msg_id),
 			PARAM_STRING(msgText.text_->text_.c_str()),
 			PARAM_NULL(),
+			PARAM_STRING(is_edited ? "1" : "0"),
 			PARAM_STRING(msgDate),
 			PARAM_STRING(dateNow),
 			PARAM_END
@@ -1048,19 +1129,8 @@ uint64_t Worker::resolveFile(tgvisd::DB *db, td_api::file &file)
 // }
 
 
-void Worker::insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataDocument(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-	return;
-
-}
-
-
-void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg,
+				   bool is_edited)
 {
 	auto &msgDoc = static_cast<td_api::messageDocument &>(*msg.content_);
 	const char *text = msgDoc.caption_->text_.c_str();
@@ -1073,21 +1143,12 @@ void Worker::_insertMsgDataDocument(uint64_t db_msg_id, td_api::message &msg)
 		text_entities = en.c_str();
 	}
 	insertMsgData__file(db_msg_id, msg, text, text_entities,
-			    *msgDoc.document_->document_);
+			    *msgDoc.document_->document_, is_edited);
 }
 
 
-void Worker::insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataAudio(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-}
-
-
-void Worker::_insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited)
 {
 	auto &msgAudio = static_cast<td_api::messageAudio &>(*msg.content_);
 	const char *text = msgAudio.caption_->text_.c_str();
@@ -1100,21 +1161,12 @@ void Worker::_insertMsgDataAudio(uint64_t db_msg_id, td_api::message &msg)
 		text_entities = en.c_str();
 	}
 	insertMsgData__file(db_msg_id, msg, text, text_entities,
-			    *msgAudio.audio_->audio_);
+			    *msgAudio.audio_->audio_, is_edited);
 }
 
 
-void Worker::insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataVideo(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-}
-
-
-void Worker::_insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited)
 {
 	auto &msgVideo = static_cast<td_api::messageVideo &>(*msg.content_);
 	const char *text = msgVideo.caption_->text_.c_str();
@@ -1127,21 +1179,12 @@ void Worker::_insertMsgDataVideo(uint64_t db_msg_id, td_api::message &msg)
 		text_entities = en.c_str();
 	}
 	insertMsgData__file(db_msg_id, msg, text, text_entities,
-			    *msgVideo.video_->video_);
+			    *msgVideo.video_->video_, is_edited);
 }
 
 
-void Worker::insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataAnimation(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-}
-
-
-void Worker::_insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg,
+				    bool is_edited)
 {
 	auto &msgAnim = static_cast<td_api::messageAnimation &>(*msg.content_);
 	const char *text = msgAnim.caption_->text_.c_str();
@@ -1154,62 +1197,21 @@ void Worker::_insertMsgDataAnimation(uint64_t db_msg_id, td_api::message &msg)
 		text_entities = en.c_str();
 	}
 	insertMsgData__file(db_msg_id, msg, text, text_entities, 
-			    *msgAnim.animation_->animation_);
+			    *msgAnim.animation_->animation_, is_edited);
 }
 
 
-void Worker::insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataSticker(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-}
-
-
-void Worker::_insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataSticker(uint64_t db_msg_id, td_api::message &msg,
+				  bool is_edited)
 {
 	auto &msgSticker = static_cast<td_api::messageSticker &>(*msg.content_);
 	const char *text = msgSticker.sticker_->emoji_.c_str();
 	insertMsgData__file(db_msg_id, msg, text, NULL,
-			    *msgSticker.sticker_->sticker_);
+			    *msgSticker.sticker_->sticker_, is_edited);
 }
 
-
-void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
-{
-	try {
-		this->_insertMsgDataPhoto(db_msg_id, msg);
-	} catch (std::string &err) {
-		std::cout << err << std::endl;
-	}
-	return;
-
-
-// 	wrk_wait();
-// 	std::thread worker([this, db_msg_id, &msg](void){
-// 		atomic_fetch_add(&wrk_online, 1);
-// 		try {
-// 			this->_insertMsgDataPhoto(db_msg_id, msg);
-// 		} catch (std::string &err) {
-// 			std::cout << err << std::endl;
-// 		}
-// 		atomic_fetch_sub(&wrk_online, 1);
-// 	});
-// #if defined(__linux__)
-// 	{
-// 		char trname[32];
-// 		pthread_t pt = worker.native_handle();
-// 		snprintf(trname, sizeof(trname), "photo-download");
-// 		pthread_setname_np(pt, trname);
-// 	}
-// #endif
-// 	worker.detach();
-}
-
-
-void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
+void Worker::insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg,
+				bool is_edited)
 {
 	auto &msgPhoto = static_cast<td_api::messagePhoto &>(*msg.content_);
 	const char *text = msgPhoto.caption_->text_.c_str();
@@ -1224,7 +1226,6 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 			if (taken_file->size_ < pfile->size_)
 				taken_file = pfile.get();
 		}
-		// std::cout << to_string(pfile) << std::endl;
 	}
 
 	if (!taken_file)
@@ -1237,13 +1238,14 @@ void Worker::_insertMsgDataPhoto(uint64_t db_msg_id, td_api::message &msg)
 		en = to_string(text_obj->entities_);
 		text_entities = en.c_str();
 	}
-	insertMsgData__file(db_msg_id, msg, text, text_entities, *taken_file);
+	insertMsgData__file(db_msg_id, msg, text, text_entities, *taken_file,
+			    is_edited);
 }
 
 
 void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 				 const char *text, const char *text_entities,
-				 td_api::file &file)
+				 td_api::file &file, bool is_edited)
 {
 	// struct db_pool *dbp = getWrkDb();
 	// if (!dbp) {
@@ -1263,7 +1265,7 @@ void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 			"`is_edited`,"			\
 			"`tg_date`,"			\
 			"`created_at`"			\
-		") VALUES (?, ?, ?, ?, '0', ?, ?);";
+		") VALUES (?, ?, ?, ?, ?, ?, ?);";
 	auto st = db_->prepare(query);
 	char dateBuf1[64], dateBuf2[64];
 	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
@@ -1275,6 +1277,7 @@ void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 			PARAM_STRING(text),
 			PARAM_STRING(text_entities),
 			PARAM_UINT(file_id),
+			PARAM_STRING(is_edited ? "1" : "0"),
 			PARAM_STRING(msgDate),
 			PARAM_STRING(dateNow),
 			PARAM_END

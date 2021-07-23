@@ -7,6 +7,7 @@ find_package(Td 1.7.5 REQUIRED)
 
 include_directories(src)
 include_directories(src/ext)
+include_directories(src/ext)
 
 
 # TD core (low level)
