@@ -981,7 +981,10 @@ void Worker::insertMsgDataText(uint64_t db_msg_id, td_api::message &msg,
 	auto &msgText = static_cast<td_api::messageText &>(*msg.content_);
 	auto st = db_->prepare(query);
 	char dateBuf1[64], dateBuf2[64];
-	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+	const char *msgDate = getDateByUnixTM(
+		is_edited ? msg.edit_date_ : msg.date_, dateBuf1,
+		sizeof(dateBuf1)
+	);
 	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
 
 	if (msgText.text_->entities_.size() > 0) {
