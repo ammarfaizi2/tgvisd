@@ -896,6 +896,8 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	if (db_msg_id != 0) {
 		if (is_edited && !has_edited_msg)
 			setHasEditedToTrue(db_msg_id, db_group_id);
+		if (!is_edited)
+			goto out_delete_chk;
 		goto insert_msg_data;
 	}
 
@@ -926,6 +928,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 insert_msg_data:
 	insertMsgData(db_msg_id, msg, is_edited);
 
+out_delete_chk:
 	if (is_deleted)
 		setIsDeletedToTrue(db_msg_id, db_group_id);
 	return 0;
