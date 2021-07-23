@@ -711,17 +711,22 @@ void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd
 			(*fwd.origin_);
 		orig_text = o.author_signature_.c_str();
 		orig_type = "channel";
-		st->execute(
-			PARAM_UINT(db_msg_id),
-			PARAM_STRING(orig_type),
-			PARAM_STRING(msgDate),
-			PARAM_STRING(pas),
-			PARAM_UINT(0),
-			PARAM_STRING(orig_text),
-			PARAM_UINT(fwd.from_chat_id_),
-			PARAM_UINT(fwd.from_message_id_),
-			PARAM_END
-		);
+		try {
+			st->execute(
+				PARAM_UINT(db_msg_id),
+				PARAM_STRING(orig_type),
+				PARAM_STRING(msgDate),
+				PARAM_STRING(pas),
+				PARAM_UINT(0),
+				PARAM_STRING(orig_text),
+				PARAM_UINT(fwd.from_chat_id_),
+				PARAM_UINT(fwd.from_message_id_),
+				PARAM_END
+			);
+		} catch (std::string &err) {
+			std::cout << err << std::endl;
+			throw err;
+		}
 		break;
 	}
 	case td_api::messageForwardOriginChat::ID: {
