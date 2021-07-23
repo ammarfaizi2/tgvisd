@@ -749,11 +749,15 @@ void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd
 
 void Worker::setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
 {
+	char dateBuf[64];
+		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
 	auto st = db_->prepare(
-		"UPDATE gw_group_messages SET has_edited_msg = '1' WHERE " \
+		"UPDATE gw_group_messages SET has_edited_msg = '1', " \
+		"updated_at = ? WHERE " \
 		"id = ? AND group_id = ? LIMIT 1"
 	);
 	st->execute(
+		PARAM_STRING(dateNow),
 		PARAM_UINT(db_msg_id),
 		PARAM_SINT(db_group_id),
 		PARAM_END
@@ -763,11 +767,15 @@ void Worker::setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
 
 void Worker::setIsDeletedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
 {
+	char dateBuf[64];
+	const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
 	auto st = db_->prepare(
-		"UPDATE gw_group_messages SET is_deleted = '1' WHERE " \
+		"UPDATE gw_group_messages SET is_deleted = '1' " \
+		"updated_at = ? WHERE " \
 		"id = ? AND group_id = ? LIMIT 1"
 	);
 	st->execute(
+		PARAM_STRING(dateNow),
 		PARAM_UINT(db_msg_id),
 		PARAM_SINT(db_group_id),
 		PARAM_END
@@ -833,7 +841,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 			"`is_deleted`,"				\
 			"`created_at`,"				\
 			"`updated_at`"				\
-		") VALUES (?, ?, ?, ?, ?, '0', ?, ?, NULL);";
+		") VALUES (?, ?, ?, ?, ?, '0', ?, ?, ?, NULL);";
 
 	const char *msg_type = NULL;
 
@@ -897,6 +905,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 			PARAM_UINT(msg.reply_to_message_id_ >> 20u),
 			PARAM_STRING(msg_type),
 			PARAM_STRING(is_forwarded_msg),
+			PARAM_STRING(is_deleted ? "1" : "0"),
 			PARAM_STRING(dateNow),
 			PARAM_END
 		);
