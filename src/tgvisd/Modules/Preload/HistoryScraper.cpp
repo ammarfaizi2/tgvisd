@@ -830,7 +830,6 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 {
 	int64_t tg_group_id;
 	uint64_t tg_msg_id;
-	uint64_t ret = 0;
 	uint64_t db_msg_id;
 	bool has_edited_msg = false;
 	const char query[] =
@@ -918,7 +917,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 
 	db_msg_id = lastInsertId();
 	if (msg.forward_info_)
-		saveForwardInfo(ret, *msg.forward_info_);
+		saveForwardInfo(db_msg_id, *msg.forward_info_);
 
 insert_msg_data:
 	insertMsgData(db_msg_id, msg, is_edited);
