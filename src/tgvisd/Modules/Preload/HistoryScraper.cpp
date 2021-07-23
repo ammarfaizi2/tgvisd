@@ -431,10 +431,13 @@ int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> event
 			break;
 		}
 		case td_api::chatEventMessageEdited::ID: {
-			bool is_edited = true;
+			bool is_edited;
 			bool is_deleted = false;
 			auto &q = static_cast<td_api::chatEventMessageEdited &>(*ev->action_);
+
+			is_edited = false;
 			processMessage(*q.old_message_, is_edited, is_deleted);
+			is_edited = true;
 			processMessage(*q.new_message_, is_edited, is_deleted);
 			break;
 		}
@@ -605,6 +608,7 @@ int64_t Worker::resolveGroup(td_api::chat &chat, td_api::chat **chat_p)
 		const char *dateNow = getDateNow(dateBuf, sizeof(dateBuf));
 		st->bind(
 			PARAM_SINT((uint64_t)chat.id_),
+			/* TODO: Adjust the group username dynamically. */
 			PARAM_STRING("GNUWeeb"),
 			PARAM_STRING(chat.title_.c_str()),
 			PARAM_STRING(dateNow),
@@ -1320,7 +1324,10 @@ void Worker::insertMsgData__file(uint64_t db_msg_id, td_api::message &msg,
 		") VALUES (?, ?, ?, ?, ?, ?, ?);";
 	auto st = db_->prepare(query);
 	char dateBuf1[64], dateBuf2[64];
-	const char *msgDate = getDateByUnixTM(msg.date_, dateBuf1, sizeof(dateBuf1));
+	const char *msgDate = getDateByUnixTM(
+		is_edited ? msg.edit_date_ : msg.date_, dateBuf1,
+		sizeof(dateBuf1)
+	);
 	const char *dateNow = getDateNow(dateBuf2, sizeof(dateBuf2));
 
 	if (text_entities) {
