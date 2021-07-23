@@ -396,13 +396,23 @@ int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> event
 		}
 		i++;
 
-		if (!trackEventId(ev->id_))
-			continue;
-
 		if (ev->action_->get_id() != td_api::chatEventMessageDeleted::ID)
 			continue;
+
+		try {
+			db_->prepare("START TRANSACTION")->execute();
+		} catch (std::string &err) {
+			std::cout << err << std::endl;
+			throw err;
+		}
+                if (!trackEventId(ev->id_)) {
+                        db_->prepare("ROLLBACK")->execute();
+                        continue;
+                }
+
 		auto &msg = static_cast<td_api::chatEventMessageDeleted &>(*ev->action_).message_;
 		processMessage(*msg);
+		db_->prepare("COMMIT")->execute();
 	}
 	return min_event;
 }
@@ -622,7 +632,7 @@ void Worker::saveForwardInfo(uint64_t db_msg_id, td_api::messageForwardInfo &fwd
 			"`origin_text`,"			\
 			"`from_chat_id`,"			\
 			"`from_msg_id`"				\
-		") VALUES (?, ?, ?, ?, ?, ?, ?);";
+		") VALUES (?, ?, ?, ?, ?, ?, ?, ?);";
 
 	char dateBuf[64];
 	const char *orig_text, *orig_type, *pas;
