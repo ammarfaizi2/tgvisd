@@ -4,12 +4,10 @@
  * @license GPL-2.0
  * @package tdvisds
  *
- * Printing functions.
+ * Print functions.
  *
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
- *
  */
-
 
 #include <time.h>
 #include <stdio.h>

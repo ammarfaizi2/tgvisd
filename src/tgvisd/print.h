@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- *  src/teavpn2/include/teavpn2/print.h
+ * @author Ammar Faizi <ammarfaizi2@gmail.com> https://www.facebook.com/ammarfaizi2
+ * @license GPL-2.0
+ * @package tdvisds
  *
- *  Printing header
+ * Print functions header.
  *
- *  Copyright (C) 2021  Ammar Faizi
+ * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
 
 #ifndef TGVISD__PRINT_H
@@ -52,7 +54,7 @@ __panic(const char *file, int lineno, const char *fmt, ...);
 
 
 #define PRERF "(errno=%d) %s"
-#define PREAR(NUM) NUM, strerror(NUM)
+#define PREAR(NUM) ((int)(NUM)), strerror((int)(NUM))
 
 #define pr_err		__pr_error
 #define pr_error	__pr_error

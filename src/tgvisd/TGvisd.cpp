@@ -8,21 +8,3 @@
  *
  * Copyright (C) 2021 Ammar Faizi <ammarfaizi2@gmail.com>
  */
-
-
-#include <thread>
-#include <cstdio>
-
-
-int tgvisdWorker(void)
-{
-
-}
-
-
-int main(int argc, char *argv[])
-{
-	int ret = 0;
-	tgvisdWorker();
-	return ret;
-}
