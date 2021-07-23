@@ -73,12 +73,13 @@ public:
 
 	void gatherChatEventLog(int64_t chat_id);
 	int64_t processChatEventLog(td_api::object_ptr<td_api::chatEvents> events);
-	void processMessage(td_api::message &msg, bool is_edited);
+	void processMessage(td_api::message &msg, bool is_edited, bool is_deleted);
 
 	uint64_t resolveUser(td_api::user &user, td_api::user **user_p);
 	int64_t resolveGroup(td_api::chat &chat, td_api::chat **chat_p);
 	uint64_t resolveMessage(td_api::message &msg, uint64_t db_user_id,
-				uint64_t db_group_id, bool is_edited);
+				uint64_t db_group_id, bool is_edited,
+				bool is_deleted);
 	uint64_t resolveFile(tgvisd::DB *db, td_api::file &file);
 	uint64_t lastInsertId(void);
 private:
@@ -116,6 +117,7 @@ private:
 	uint64_t getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
 				    bool *has_edited_msg);
 
+	void setIsDeletedToTrue(uint64_t db_msg_id, uint64_t db_group_id);
 	void setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id);
 };
 
@@ -396,6 +398,8 @@ int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> event
 	int64_t min_event = -1;
 	size_t i = 0;
 	for (auto &ev: events->events_) {
+		int64_t obj_id;
+
 		if (i == 0) {
 			min_event = ev->id_;
 		} else if (ev->id_ < min_event) {
@@ -403,29 +407,45 @@ int64_t Worker::processChatEventLog(td_api::object_ptr<td_api::chatEvents> event
 		}
 		i++;
 
-		if (ev->action_->get_id() != td_api::chatEventMessageDeleted::ID)
+		obj_id = ev->action_->get_id();
+
+		if (
+			(obj_id != td_api::chatEventMessageDeleted::ID) &&
+			(obj_id != td_api::chatEventMessageEdited::ID)
+		)
 			continue;
 
-		try {
-			db_->prepare("START TRANSACTION")->execute();
-		} catch (std::string &err) {
-			std::cout << err << std::endl;
-			throw err;
-		}
-                if (!trackEventId(ev->id_)) {
-                        db_->prepare("ROLLBACK")->execute();
-                        continue;
-                }
 
-		auto &msg = static_cast<td_api::chatEventMessageDeleted &>(*ev->action_).message_;
-		processMessage(*msg, false);
+		db_->prepare("START TRANSACTION")->execute();
+		if (!trackEventId(ev->id_)) {
+			db_->prepare("ROLLBACK")->execute();
+			continue;
+		}
+
+		switch (obj_id) {
+		case td_api::chatEventMessageDeleted::ID: {
+			bool is_edited = false;
+			bool is_deleted = false;
+			auto &msg = static_cast<td_api::chatEventMessageDeleted &>(*ev->action_).message_;
+			processMessage(*msg, is_edited, is_deleted);
+			break;
+		}
+		case td_api::chatEventMessageEdited::ID: {
+			bool is_edited = true;
+			bool is_deleted = false;
+			auto &q = static_cast<td_api::chatEventMessageEdited &>(*ev->action_);
+			processMessage(*q.old_message_, is_edited, is_deleted);
+			processMessage(*q.new_message_, is_edited, is_deleted);
+			break;
+		}
+		}
 		db_->prepare("COMMIT")->execute();
 	}
 	return min_event;
 }
 
 
-void Worker::processMessage(td_api::message &msg, bool is_edited)
+void Worker::processMessage(td_api::message &msg, bool is_edited, bool is_deleted)
 {
 	printf("In processMessage\n");
 	if (msg.sender_->get_id() != td_api::messageSenderUser::ID)
@@ -446,7 +466,7 @@ void Worker::processMessage(td_api::message &msg, bool is_edited)
 	uint64_t db_group_id = resolveGroup(*chat_, &chat);
 	// printf("db_user_id = %lu\n", db_user_id);
 	// printf("db_group_id = %lu\n", db_group_id);
-	resolveMessage(msg, db_user_id, db_group_id, is_edited);
+	resolveMessage(msg, db_user_id, db_group_id, is_edited, is_deleted);
 }
 
 
@@ -741,6 +761,20 @@ void Worker::setHasEditedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
 }
 
 
+void Worker::setIsDeletedToTrue(uint64_t db_msg_id, uint64_t db_group_id)
+{
+	auto st = db_->prepare(
+		"UPDATE gw_group_messages SET is_deleted = '1' WHERE " \
+		"id = ? AND group_id = ? LIMIT 1"
+	);
+	st->execute(
+		PARAM_UINT(db_msg_id),
+		PARAM_SINT(db_group_id),
+		PARAM_END
+	);
+}
+
+
 uint64_t Worker::getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
 				    bool *has_edited_msg)
 {
@@ -764,7 +798,7 @@ uint64_t Worker::getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
 			char buffer[5];
 			IS_OK(mysqlx_get_bytes(row, 1, 0, buffer, &len),
 			      st->getStmt());
-			*has_edited_msg = (*buffer == 1);
+			*has_edited_msg = (*buffer == '1');
 		}
 
 		return ret;
@@ -778,7 +812,8 @@ uint64_t Worker::getDBMsgIdIfExists(uint64_t tg_msg_id, uint64_t chat_id,
 
 
 uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
-				uint64_t db_group_id, bool is_edited)
+				uint64_t db_group_id, bool is_edited,
+				bool is_deleted)
 {
 	int64_t tg_group_id;
 	uint64_t tg_msg_id;
@@ -795,6 +830,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 			"`msg_type`,"				\
 			"`has_edited_msg`,"			\
 			"`is_forwarded_msg`,"			\
+			"`is_deleted`,"				\
 			"`created_at`,"				\
 			"`updated_at`"				\
 		") VALUES (?, ?, ?, ?, ?, '0', ?, ?, NULL);";
@@ -842,7 +878,7 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 	tg_msg_id = (uint64_t)msg.id_;
 	db_msg_id = getDBMsgIdIfExists(tg_msg_id, tg_group_id, &has_edited_msg);
 	if (db_msg_id != 0) {
-		if (has_edited_msg)
+		if (is_edited && !has_edited_msg)
 			setHasEditedToTrue(db_msg_id, db_group_id);
 		goto insert_msg_data;
 	}
@@ -872,6 +908,9 @@ uint64_t Worker::resolveMessage(td_api::message &msg, uint64_t db_user_id,
 
 insert_msg_data:
 	insertMsgData(db_msg_id, msg, is_edited);
+
+	if (is_deleted)
+		setIsDeletedToTrue(db_msg_id, db_group_id);
 	return 0;
 }
 
