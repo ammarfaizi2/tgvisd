@@ -7,6 +7,8 @@ find_package(Td 1.7.5 REQUIRED)
 
 include_directories(src)
 include_directories(src/ext)
+include_directories(src/ext/mysql_cpp/include)
+link_directories(src/ext/mysql_cpp/build)
 
 # TD core (low level)
 set(TGVISD_TD_SOURCE
@@ -18,6 +20,8 @@ set(TGVISD_TD_SOURCE
 # tgvisd core
 set(TGVISD_CORE_SOURCE
   src/tgvisd/common.hpp
+  src/tgvisd/DB.cpp
+  src/tgvisd/DB.hpp
   src/tgvisd/entry.cpp
   src/tgvisd/Main.cpp
   src/tgvisd/Main.hpp
@@ -47,7 +51,7 @@ target_compile_options(tgvisd-td PRIVATE
 add_executable(tgvisd ${TGVISD_CORE_SOURCE})
 set_property(TARGET tgvisd PROPERTY CXX_STANDARD 20)
 set_property(TARGET tgvisd PROPERTY C_STANDARD 11)
-target_link_libraries(tgvisd tgvisd-td pthread curl)
+target_link_libraries(tgvisd tgvisd-td pthread curl mysqlcppconn8)
 target_include_directories(tgvisd PRIVATE td/include)
 target_compile_options(tgvisd PRIVATE
   -ggdb3

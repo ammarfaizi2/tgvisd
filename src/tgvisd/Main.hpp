@@ -15,11 +15,18 @@
 
 namespace tgvisd {
 
+extern volatile bool stopEventLoop;
+
 class Main {
 public:
 	Main(uint32_t api_id, const char *api_hash, const char *data_path);
 	~Main(void);
 	int run(void);
+
+	inline bool getStop(void)
+	{
+		return stopEventLoop;
+	}
 
 	inline bool isReady(void)
 	{

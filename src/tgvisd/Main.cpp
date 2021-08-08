@@ -14,19 +14,22 @@
 #include <signal.h>
 #include <unistd.h>
 
+
+namespace tgvisd {
+
 /* 
  * Interrupt handler for Linux only.
  */
+volatile bool stopEventLoop = false;
 static std::mutex sig_mutex;
-static volatile bool is_signaled = false;
 static volatile bool is_sighandler_set = false;
 
 
 static void main_sighandler(int sig)
 {
-	if (!is_signaled) {
+	if (!stopEventLoop) {
 		printf("\nGot an interrupt signal %d\n", sig);
-		is_signaled = true;
+		stopEventLoop = true;
 	}
 }
 
@@ -55,9 +58,6 @@ static void set_interrupt_handler(void)
 	sig_mutex.unlock();
 }
 #endif /* #if defined(__linux__) */
-
-
-namespace tgvisd {
 
 
 static void updateNewMessage(Main *main, td_api::updateNewMessage &update);
@@ -128,7 +128,7 @@ int Main::run(void)
 		 * when we get interrupted. For example, if
 		 * the user presses CTRL + C (got SIGINT).
 		 */
-		if (__builtin_expect(is_signaled, 0))
+		if (unlikely(stopEventLoop))
 			break;
 #endif
 		td_.loop(timeout);

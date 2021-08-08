@@ -8,6 +8,7 @@
  */
 
 #if defined(__linux__)
+#include <unistd.h>
 #include <pthread.h>
 #endif
 
@@ -39,7 +40,17 @@ Scraper::~Scraper(void)
 
 void Scraper::run(void)
 {
-	pr_notice("In scraper...");
+	while (!main_->isReady() && !main_->getStop()) {
+		pr_notice("In scraper (waiting for main thread to be ready)...");
+		sleep(1);
+	}
+
+	while (!main_->getStop()) {
+		pr_notice("In scraper...");
+		sleep(1);
+	}
+
+	pr_notice("Closing scraper...");
 }
 
 
