@@ -32,9 +32,7 @@ DB::DB(const char *host, uint16_t port, const char *user, const char *pass,
 	user_[sizeof(user_) - 1] = '\0';
 	pass_[sizeof(pass_) - 1] = '\0';
 	database_[sizeof(database_) - 1] = '\0';
-
-	if (port == 0)
-		port_ = 33060;
+	port_ = (port == 0) ? 33060 : port;
 }
 
 
