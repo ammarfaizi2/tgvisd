@@ -18,7 +18,13 @@ namespace tgvisd::DBFunc {
 
 class DBStatement {
 public:
-	~DBStatement(void);
+	~DBStatement(void)
+	{
+		if (res_) {
+			mysqlx_free(res_);
+			res_ = nullptr;
+		}
+	}
 
 
 	inline DBStatement(mysqlx_session_t *sess, const char *query,

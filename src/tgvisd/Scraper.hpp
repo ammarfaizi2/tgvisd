@@ -10,6 +10,7 @@
 #ifndef TGVISD__SCRAPER_HPP
 #define TGVISD__SCRAPER_HPP
 
+#include <tgvisd/DB.hpp>
 #include <tgvisd/Td/Td.hpp>
 #include <tgvisd/common.hpp>
 
@@ -25,6 +26,7 @@ public:
 	void run(void);
 
 private:
+	DB *db_ = nullptr;
 	Main *main_ = nullptr;
 };
 

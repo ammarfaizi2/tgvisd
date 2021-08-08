@@ -10,6 +10,7 @@
 #ifndef TGVISD__DB_HPP
 #define TGVISD__DB_HPP
 
+#include <cstdlib>
 #include <tgvisd/DBCommon.hpp>
 #include <tgvisd/DBFunc/DBStatement.hpp>
 
@@ -27,6 +28,10 @@ public:
 	void connect(void);
 	void close(void);
 
+	void beginTransaction(void);
+	void commit(void);
+	void rollback(void);
+
 	inline mysqlx_session_t *getSess(void)
 	{
 		return sess_;
@@ -37,6 +42,7 @@ public:
 		return std::make_unique<DBStatement>(sess_, query);
 	}
 
+	static DB *create_conn_from_env(void);
 private:
 	uint16_t port_;
 	char host_[128];

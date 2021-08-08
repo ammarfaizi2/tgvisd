@@ -102,10 +102,10 @@ Main::~Main(void)
 		delete scraperThread_;
 	}
 
-	pr_notice("Syncing...");
 	td_.close();
 
 #if defined(__linux__)
+	pr_notice("Syncing...");
 	sync();
 #endif
 }

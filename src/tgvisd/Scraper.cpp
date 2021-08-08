@@ -35,6 +35,10 @@ Scraper::Scraper(Main *main, std::thread *threadPtr):
 
 Scraper::~Scraper(void)
 {
+	if (db_) {
+		delete db_;
+		db_ = nullptr;
+	}
 }
 
 
@@ -45,8 +49,10 @@ void Scraper::run(void)
 		sleep(1);
 	}
 
+	db_ = DB::create_conn_from_env();
 	while (!main_->getStop()) {
-		pr_notice("In scraper...");
+		auto st = db_->prepare("SELECT NOW();");
+		st->execute();
 		sleep(1);
 	}
 
