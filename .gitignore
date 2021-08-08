@@ -4,3 +4,4 @@ accounts/
 accounts.txt
 /core
 *.sql.gz
+start.sh

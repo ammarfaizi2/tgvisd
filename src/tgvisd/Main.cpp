@@ -18,8 +18,8 @@
  * Interrupt handler for Linux only.
  */
 static std::mutex sig_mutex;
-static bool is_signaled = false;
-static bool is_sighandler_set = false;
+static volatile bool is_signaled = false;
+static volatile bool is_sighandler_set = false;
 
 
 static void main_sighandler(int sig)
@@ -83,7 +83,33 @@ Main::~Main(void)
 
 int Main::run(void)
 {
+	constexpr int timeout = 1;
+
+	td_.loop(timeout);
+
+	while (true) {
+
+#if defined(__linux__)
+		/*
+		 * We have a signal handler on Linux.
+		 *
+		 * This can ensure the destructor is called
+		 * when we get interrupted. For example, if
+		 * the user presses CTRL + C (got SIGINT).
+		 */
+		if (__builtin_expect(is_signaled, 0))
+			break;
+#endif
+		td_.loop(timeout);
+	}
+
 	return 0;
+}
+
+
+static void updateNewMessage(Main *main, td_api::updateNewMessage &update)
+{
+
 }
 
 
