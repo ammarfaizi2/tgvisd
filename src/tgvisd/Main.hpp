@@ -21,8 +21,16 @@ public:
 	~Main(void);
 	int run(void);
 
+	inline bool isReady(void)
+	{
+		return isReady_;
+	}
+
 private:
 	tgvisd::Td::Td td_;
+	volatile bool isReady_ = false;
+	std::thread *loggerThread_ = nullptr;
+	std::thread *scraperThread_ = nullptr;
 };
 
 } /* namespace tgvisd */

@@ -8,7 +8,7 @@
  */
 
 #include <tgvisd/Main.hpp>
-
+#include <tgvisd/Scraper.hpp>
 
 #if defined(__linux__)
 #include <signal.h>
@@ -73,11 +73,41 @@ Main::Main(uint32_t api_id, const char *api_hash, const char *data_path):
 	td_.callback.updateNewMessage = [this](td_api::updateNewMessage &update){
 		updateNewMessage(this, update);
 	};
+
+	pr_notice("Spawning logger thread...");
+	loggerThread_ = new std::thread([this]{
+		
+	});
+
+	pr_notice("Spawning scraper thread...");
+	scraperThread_ = new std::thread([this]{
+		Scraper *st = new Scraper(this, this->loggerThread_);
+		st->run();
+		delete st;
+	});
 }
 
 
 Main::~Main(void)
 {
+	if (loggerThread_) {
+		pr_notice("Waiting for logger thread to exit...");
+		loggerThread_->join();
+		delete loggerThread_;
+	}
+
+	if (scraperThread_) {
+		pr_notice("Waiting for scraper thread to exit...");
+		scraperThread_->join();
+		delete scraperThread_;
+	}
+
+	pr_notice("Syncing...");
+	td_.close();
+
+#if defined(__linux__)
+	sync();
+#endif
 }
 
 
@@ -86,6 +116,7 @@ int Main::run(void)
 	constexpr int timeout = 1;
 
 	td_.loop(timeout);
+	isReady_ = true;
 
 	while (true) {
 

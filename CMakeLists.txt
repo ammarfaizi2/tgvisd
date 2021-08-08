@@ -23,6 +23,8 @@ set(TGVISD_CORE_SOURCE
   src/tgvisd/Main.hpp
   src/tgvisd/print.c
   src/tgvisd/print.h
+  src/tgvisd/Scraper.cpp
+  src/tgvisd/Scraper.hpp
 )
 
 # Build the shared library that contains tdlib core.
