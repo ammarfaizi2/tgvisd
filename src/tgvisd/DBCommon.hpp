@@ -32,7 +32,7 @@ inline static void mysql_stmt_create_chk(mysqlx_stmt_t *stmt,
 
 inline static void mysql_exec_chk(int res, mysqlx_stmt_t *stmt)
 {
-	if (res != RESULT_OK) {
+	if (unlikely(res != RESULT_OK)) {
 		char buf[512];
 		snprintf(buf, sizeof(buf), "MySQL Exec Error: %s",
 			 mysqlx_error_message(stmt));
@@ -46,6 +46,17 @@ inline static void mysql_result_chk(mysqlx_result_t *res, mysqlx_stmt_t *stmt)
 	if (unlikely(!res)) {
 		char buf[512];
 		snprintf(buf, sizeof(buf), "MySQL Result Error: %s",
+			 mysqlx_error_message(stmt));
+		throw std::runtime_error(std::string(buf));
+	}
+}
+
+
+inline static void mysql_fetch_chk(int ret, mysqlx_stmt_t *stmt)
+{
+	if (unlikely(ret == RESULT_ERROR)) {
+		char buf[512];
+		snprintf(buf, sizeof(buf), "MySQL Fetch Error: %s",
 			 mysqlx_error_message(stmt));
 		throw std::runtime_error(std::string(buf));
 	}

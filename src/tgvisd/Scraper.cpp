@@ -42,6 +42,24 @@ Scraper::~Scraper(void)
 }
 
 
+static void run_scraper(Scraper *s, Main *main, DB *db)
+{
+	auto st = db->prepare("SELECT eeee;");
+	st->execute();
+	if (auto row = st->fetch()) {
+		int ft;
+		char buffer[64];
+		auto stmt = st->getStmt();
+		size_t len = sizeof(buffer);
+
+		ft = mysqlx_get_bytes(row, 0, 0, buffer, &len);
+		mysql_fetch_chk(ft, stmt);
+		pr_notice("buf = %s (len = %zu)", buffer, len);
+	}
+	sleep(1);
+}
+
+
 void Scraper::run(void)
 {
 	while (!main_->isReady() && !main_->getStop()) {
@@ -49,14 +67,20 @@ void Scraper::run(void)
 		sleep(1);
 	}
 
-	db_ = DB::create_conn_from_env();
-	db_->connect();
-	while (!main_->getStop()) {
-		auto st = db_->prepare("SELECT NOW();");
-		st->execute();
-		sleep(1);
+	try {
+		db_ = DB::create_conn_from_env();
+		db_->connect();
+
+		while (!main_->getStop())
+			run_scraper(this, main_, db_);
+
+	} catch (std::runtime_error &e) {
+		pr_err("std::runtime_error: %s", e.what());
+		main_->doStop();
+		goto out;
 	}
 
+out:
 	pr_notice("Closing scraper...");
 }
 

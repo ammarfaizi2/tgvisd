@@ -23,6 +23,11 @@ public:
 	~Main(void);
 	int run(void);
 
+	inline void doStop(void)
+	{
+		stopEventLoop = true;
+	}
+
 	inline bool getStop(void)
 	{
 		return stopEventLoop;
