@@ -19,9 +19,12 @@ set(TGVISD_TD_SOURCE
 
 # tgvisd core
 set(TGVISD_CORE_SOURCE
+  src/tgvisd/DBFunc/DBStatement.cpp
+  src/tgvisd/DBFunc/DBStatement.hpp
   src/tgvisd/common.hpp
   src/tgvisd/DB.cpp
   src/tgvisd/DB.hpp
+  src/tgvisd/DBCommon.hpp
   src/tgvisd/entry.cpp
   src/tgvisd/Main.cpp
   src/tgvisd/Main.hpp

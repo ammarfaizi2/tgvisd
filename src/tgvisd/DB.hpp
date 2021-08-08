@@ -10,13 +10,16 @@
 #ifndef TGVISD__DB_HPP
 #define TGVISD__DB_HPP
 
-#include <mysqlx/xapi.h>
-#include <tgvisd/common.hpp>
+#include <tgvisd/DBCommon.hpp>
+#include <tgvisd/DBFunc/DBStatement.hpp>
+
+using namespace tgvisd::DBFunc;
 
 namespace tgvisd {
 
 class DB {
 public:
+
 	DB(void);
 	~DB(void);
 	DB(const char *host, uint16_t port, const char *user, const char *pass,
@@ -27,6 +30,11 @@ public:
 	inline mysqlx_session_t *getSess(void)
 	{
 		return sess_;
+	}
+
+	inline std::unique_ptr<DBStatement> prepare(const char *query)
+	{
+		return std::make_unique<DBStatement>(sess_, query);
 	}
 
 private:
