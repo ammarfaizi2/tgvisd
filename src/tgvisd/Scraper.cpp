@@ -50,6 +50,7 @@ void Scraper::run(void)
 	}
 
 	db_ = DB::create_conn_from_env();
+	db_->connect();
 	while (!main_->getStop()) {
 		auto st = db_->prepare("SELECT NOW();");
 		st->execute();

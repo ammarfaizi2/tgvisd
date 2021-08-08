@@ -55,7 +55,7 @@ static inline void set_notice_level(uint8_t level)
 #define pr_dbg		__pr_debug
 #define panic(...)	__panic(__FILE__, __LINE__, __VA_ARGS__)
 
-#ifdef NDEBUG
+#ifdef TGVISD_NDEBUG
 	/* No debug */
 	#define pr_debug(...)
 #else
