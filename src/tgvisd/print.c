@@ -5,6 +5,7 @@
  *  Copyright (C) 2021  Ammar Faizi
  */
 
+#include <string.h>
 #include <stdarg.h>
 #include <tgvisd/print.h>
 

@@ -8,6 +8,7 @@
  */
 
 #include <cstring>
+#include <stdexcept>
 #include <tgvisd/DB.hpp>
 
 
@@ -19,7 +20,7 @@ DB::DB(void)
 
 
 DB::DB(const char *host, uint16_t port, const char *user, const char *pass,
-       const char *database):
+       const char *database)
 {
 	strncpy(host_, host, sizeof(host_) - 1);
 	strncpy(user_, user, sizeof(user_) - 1);
@@ -54,12 +55,18 @@ void DB::connect(void)
 }
 
 
-DB::~DB(void)
+void DB::close(void)
 {
 	if (sess_) {
 		mysqlx_session_close(sess_);
 		sess_ = nullptr;
 	}
+}
+
+
+DB::~DB(void)
+{
+	close();
 }
 
 } /* namespace tgvisd */

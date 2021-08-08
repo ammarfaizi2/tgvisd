@@ -10,6 +10,7 @@
 #ifndef TGVISD__DB_HPP
 #define TGVISD__DB_HPP
 
+#include <mysqlx/xapi.h>
 #include <tgvisd/common.hpp>
 
 namespace tgvisd {
@@ -21,8 +22,15 @@ public:
 	DB(const char *host, uint16_t port, const char *user, const char *pass,
 	   const char *database);
 	void connect(void);
+	void close(void);
+
+	inline mysqlx_session_t *getSess(void)
+	{
+		return sess_;
+	}
+
 private:
-	uint16_t port;
+	uint16_t port_;
 	char host_[128];
 	char user_[128];
 	char pass_[128];
