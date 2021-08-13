@@ -38,6 +38,11 @@ public:
 		return isReady_;
 	}
 
+	inline tgvisd::Td::Td *getTd(void)
+	{
+		return &td_;
+	}
+
 private:
 	tgvisd::Td::Td td_;
 	volatile bool isReady_ = false;

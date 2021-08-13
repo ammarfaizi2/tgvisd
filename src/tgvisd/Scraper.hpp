@@ -10,11 +10,11 @@
 #ifndef TGVISD__SCRAPER_HPP
 #define TGVISD__SCRAPER_HPP
 
-#include <tgvisd/DB.hpp>
 #include <tgvisd/Td/Td.hpp>
 #include <tgvisd/common.hpp>
 
 #include <tgvisd/Main.hpp>
+#include <tgvisd/Scrapers/ChatScraper.hpp>
 
 namespace tgvisd {
 
@@ -25,9 +25,15 @@ public:
 	~Scraper(void);
 	void run(void);
 
+	inline Main *getMain(void)
+	{
+		return main_;
+	}
+
 private:
-	DB *db_ = nullptr;
+	void runScrapers(void);
 	Main *main_ = nullptr;
+	tgvisd::Scrapers::ChatScraper *chatScraper_ = nullptr;
 };
 
 } /* namespace tgvisd */
