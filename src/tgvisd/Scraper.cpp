@@ -35,28 +35,35 @@ Scraper::Scraper(Main *main, std::thread *threadPtr):
 
 Scraper::~Scraper(void)
 {
-	if (db_) {
-		delete db_;
-		db_ = nullptr;
+	if (chatScraper_) {
+		delete chatScraper_;
+		chatScraper_ = nullptr;
 	}
 }
 
 
-static void run_scraper(Scraper *s, Main *main, DB *db)
+static void runScrapers(Scraper *sc)
 {
-	auto st = db->prepare("SELECT eeee;");
-	st->execute();
-	if (auto row = st->fetch()) {
-		int ft;
-		char buffer[64];
-		auto stmt = st->getStmt();
-		size_t len = sizeof(buffer);
+	// auto st = db->prepare("SELECT eeee;");
+	// st->execute();
+	// if (auto row = st->fetch()) {
+	// 	int ft;
+	// 	char buffer[64];
+	// 	auto stmt = st->getStmt();
+	// 	size_t len = sizeof(buffer);
 
-		ft = mysqlx_get_bytes(row, 0, 0, buffer, &len);
-		mysql_fetch_chk(ft, stmt);
-		pr_notice("buf = %s (len = %zu)", buffer, len);
-	}
-	sleep(1);
+	// 	ft = mysqlx_get_bytes(row, 0, 0, buffer, &len);
+	// 	mysql_fetch_chk(ft, stmt);
+	// 	pr_notice("buf = %s (len = %zu)", buffer, len);
+	// }
+	// sleep(1);
+
+	sc->chatScraper_ = new tgvisd::Scrapers::ChatScraper(sc);
+
+	std::thread chatScraper([sc]{
+		sc->chatScraper_->run();
+	});
+	chatScraper.join();
 }
 
 
@@ -68,12 +75,7 @@ void Scraper::run(void)
 	}
 
 	try {
-		db_ = DB::create_conn_from_env();
-		db_->connect();
-
-		while (!main_->getStop())
-			run_scraper(this, main_, db_);
-
+		runScrapers(this);
 	} catch (std::runtime_error &e) {
 		pr_err("std::runtime_error: %s", e.what());
 		main_->doStop();
