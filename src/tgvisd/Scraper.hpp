@@ -30,10 +30,10 @@ public:
 		return main_;
 	}
 
-private:
-	void runScrapers(void);
-	Main *main_ = nullptr;
 	tgvisd::Scrapers::ChatScraper *chatScraper_ = nullptr;
+
+private:
+	Main *main_ = nullptr;
 };
 
 } /* namespace tgvisd */

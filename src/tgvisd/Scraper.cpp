@@ -42,7 +42,7 @@ Scraper::~Scraper(void)
 }
 
 
-void Scraper::runScrapers(void)
+static void runScrapers(Scraper *sc)
 {
 	// auto st = db->prepare("SELECT eeee;");
 	// st->execute();
@@ -58,10 +58,10 @@ void Scraper::runScrapers(void)
 	// }
 	// sleep(1);
 
-	chatScraper_ = new tgvisd::Scrapers::ChatScraper(this);
+	sc->chatScraper_ = new tgvisd::Scrapers::ChatScraper(sc);
 
-	std::thread chatScraper([this]{
-		this->chatScraper_->run();
+	std::thread chatScraper([sc]{
+		sc->chatScraper_->run();
 	});
 	chatScraper.join();
 }
@@ -75,7 +75,7 @@ void Scraper::run(void)
 	}
 
 	try {
-		runScrapers();
+		runScrapers(this);
 	} catch (std::runtime_error &e) {
 		pr_err("std::runtime_error: %s", e.what());
 		main_->doStop();
