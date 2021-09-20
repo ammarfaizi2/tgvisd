@@ -1,7 +1,18 @@
-td/
-build/
-accounts/
-accounts.txt
+# SPDX-License-Identifier: GPL-2.0-only
+
+*.a
+*.o
+*.lo
+*.so
+*.so.*
+*.swo
+*.swp
+*.tmp
+*.lock
+
+/tdlib/
+/build/
+/accounts/
+
 /core
-*.sql.gz
-start.sh
+/accounts.map.txt

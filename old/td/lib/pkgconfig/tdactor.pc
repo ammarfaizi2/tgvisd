@@ -1,0 +1,9 @@
+prefix=/home/ammarfaizi2/project/now/tdlib
+
+Name: tdactor
+Description: Telegram Library - Actor
+Version: 1.7.8
+
+CFlags: -I"${prefix}/include"
+Libs: -L"${prefix}/lib" -ltdactor
+Requires.private: tdutils

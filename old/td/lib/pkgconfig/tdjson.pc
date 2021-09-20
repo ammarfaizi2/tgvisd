@@ -1,0 +1,9 @@
+prefix=/home/ammarfaizi2/project/now/tdlib
+
+Name: tdjson
+Description: Telegram Library - JSON interface (shared)
+Version: 1.7.8
+
+CFlags: -I"${prefix}/include"
+Libs: -L"${prefix}/lib" -ltdjson
+Requires.private: tdjson_private

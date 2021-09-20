@@ -1,0 +1,10 @@
+prefix=/home/ammarfaizi2/project/now/tdlib
+
+Name: tdcore
+Description: Telegram Library - Core
+Version: 1.7.8
+
+CFlags: -I"${prefix}/include"
+Libs: -L"${prefix}/lib" -ltdcore
+Requires.private: tdapi tdactor tdutils tdnet tddb
+Libs.private: -L"/usr/lib/x86_64-linux-gnu" -l:libcrypto.so -ldl -L"/usr/lib/x86_64-linux-gnu" -l:libz.so

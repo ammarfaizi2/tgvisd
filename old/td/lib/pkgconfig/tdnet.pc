@@ -1,0 +1,10 @@
+prefix=/home/ammarfaizi2/project/now/tdlib
+
+Name: tdnet
+Description: Telegram Library - Net
+Version: 1.7.8
+
+CFlags: -I"${prefix}/include"
+Libs: -L"${prefix}/lib" -ltdnet
+Requires.private: tdutils tdactor
+Libs.private: -L"/usr/lib/x86_64-linux-gnu" -l:libssl.so -L"/usr/lib/x86_64-linux-gnu" -l:libcrypto.so -ldl -L"/usr/lib/x86_64-linux-gnu" -l:libz.so
